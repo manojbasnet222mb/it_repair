@@ -835,7 +835,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
                                     $tempFileUrl = '';
                                     if (isset($file['tmp_name']) && file_exists($file['tmp_name'])) {
-                                        $basePath = str_replace('/customer/request_new.php', '', $_SERVER['SCRIPT_NAME']);
+                                        // Adjusted to match the correct URL (without /public/)
+                                        $basePath = '/it_repair'; // Matches your project root URL
                                         $absoluteTempPath = realpath($file['tmp_name']);
                                         $projectRoot = realpath(__DIR__ . '/../../');
                                         if ($absoluteTempPath && strpos($absoluteTempPath, $projectRoot) === 0) {

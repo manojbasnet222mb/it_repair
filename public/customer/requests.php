@@ -2,7 +2,7 @@
 /**
  * Customer Requests — NexusFix (Ultimate Edition)
  * World-class UX inspired by Apple, Microsoft, and Best Buy.
- * Enhanced to display attached media thumbnails.
+ * Enhanced: Attachments are now clickable to view or download.
  */
 
 declare(strict_types=1);
@@ -60,22 +60,26 @@ function get_request_attachments(int $request_id): array {
     $stmt->execute([$request_id]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
 // --- Helper function to determine if a file type is an image ---
 function is_image_type(string $file_type): bool {
     $image_types = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
     return in_array(strtolower($file_type), $image_types);
 }
+
 // --- Helper function to determine if a file type is a video ---
 function is_video_type(string $file_type): bool {
     $video_types = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
     return in_array(strtolower($file_type), $video_types);
 }
+
 // --- Helper function to get the full URL for a file path ---
 function get_file_url(string $file_path): string {
-    // Assuming base_url() returns the web root path (e.g., http://localhost/it_repair/)
-    return base_url($file_path);
+    $base = rtrim(dirname(base_url()), '/'); // removes /public
+    return $base . '/' . ltrim($file_path, '/');
 }
 ?>
+
 <!doctype html>
 <html lang="en" data-theme="dark">
 <head>
@@ -297,41 +301,34 @@ function get_file_url(string $file_path): string {
     }
 
     /* Attachments */
-    .attachments-section {
-        margin-top: 15px;
-        padding-top: 10px;
-        border-top: 1px solid var(--field-border);
-    }
-    .attachments-label {
-        font-weight: 600;
-        margin-bottom: 8px;
-        display: block;
-        color: var(--text);
-    }
     .attachments-grid {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 8px;
     }
     .attachment-item {
         position: relative;
-        width: 80px;
-        height: 80px;
+        width: 100px;
+        height: 100px;
         border-radius: 8px;
         overflow: hidden;
         border: 1px solid var(--field-border);
-        background-color: var(--card-2, var(--card));
+        background-color: var(--card);
+        cursor: pointer;
     }
-    .attachment-item img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
+    .attachment-item img,
     .attachment-item video {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        background: var(--muted);
+        transition: transform 0.2s ease;
+    }
+    .attachment-item:hover img,
+    .attachment-item:hover video {
+        transform: scale(1.05);
+    }
+    .attachment-item video {
+        background: #111;
     }
     .attachment-placeholder {
         display: flex;
@@ -339,12 +336,10 @@ function get_file_url(string $file_path): string {
         justify-content: center;
         width: 100%;
         height: 100%;
-        background: var(--card-2, var(--card));
+        background: var(--field-border);
         color: var(--muted);
-        font-size: 0.7rem;
-        text-align: center;
-        padding: 2px;
-        box-sizing: border-box;
+        font-size: 0.75rem;
+        font-weight: bold;
     }
     .attachment-filename {
         position: absolute;
@@ -353,13 +348,70 @@ function get_file_url(string $file_path): string {
         right: 0;
         background: rgba(0,0,0,0.7);
         color: white;
-        font-size: 0.6rem;
+        font-size: 0.65rem;
         padding: 2px 4px;
         text-align: center;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    /* Lightbox Modal */
+    .lightbox {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    .lightbox.active {
+      display: flex;
+    }
+    .lightbox-content {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+    }
+    .lightbox-content img,
+    .lightbox-content video {
+      max-width: 100%;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox-video {
+      background: #000;
+    }
+    .lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      font-size: 1.5rem;
+      border-radius: 50%;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+    }
+    .lightbox-close:hover {
+      background: rgba(255,255,255,0.3);
+    }
+    .lightbox-filename {
+      margin-top: 10px;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
     .no-attachments {
         color: var(--muted);
         font-size: 0.9rem;
@@ -428,7 +480,7 @@ function get_file_url(string $file_path): string {
             $inv->execute([$r['id']]);
             $invoice = $inv->fetch();
 
-            // --- Fetch attachments for this request ---
+            // Fetch attachments
             $attachments = get_request_attachments((int)$r['id']);
           ?>
           <article class="request-item"
@@ -452,70 +504,72 @@ function get_file_url(string $file_path): string {
               <div><strong>Priority:</strong> <strong style="color:#fbbf24;"><?= e(ucfirst($r['priority'])) ?></strong></div>
             </div>
 
-            <!-- Attachments Section -->
-            <div class="attachments-section">
-                <span class="attachments-label">Attachments:</span>
-                <?php if (empty($attachments)): ?>
-                    <span class="no-attachments">No files attached.</span>
-                <?php else: ?>
-                    <div class="attachments-grid">
-                        <?php foreach ($attachments as $attachment): ?>
-                            <?php
-                                $file_path = $attachment['file_path'];
-                                $file_type = strtolower($attachment['file_type']);
-                                $full_url = get_file_url($file_path); // Use the helper function
-                                $is_image = is_image_type($file_type);
-                                $is_video = is_video_type($file_type);
-                                // Get just the filename for display
-                                $filename = basename($file_path);
-                            ?>
-                            <div class="attachment-item">
-                                <?php if ($is_image): ?>
-                                    <img src="<?= e($full_url) ?>" alt="Attachment: <?= e($filename) ?>">
-                                <?php elseif ($is_video): ?>
-                                    <video muted playsinline>
-                                        <source src="<?= e($full_url) ?>" type="video/<?= e($file_type) ?>">
-                                        <div class="attachment-placeholder">🎥 <?= strtoupper(e($file_type)) ?></div>
-                                    </video>
-                                <?php else: ?>
-                                    <!-- Placeholder for non-image/video files -->
-                                    <div class="attachment-placeholder"><?= strtoupper(e($file_type)) ?></div>
-                                <?php endif; ?>
-                                <div class="attachment-filename"><?= e($filename) ?></div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-            <!-- End Attachments Section -->
-
             <details>
               <summary>Details & Timeline</summary>
-              <div style="margin-top:12px;">
-                <p><strong>Issue:</strong> <?= nl2br(e($r['issue_description'])) ?></p>
-                <p><strong>Service:</strong> <?= e(ucfirst($r['service_type'])) ?> •
-                   <strong>Contact:</strong> <?= e($r['preferred_contact']) ?></p>
-                <?php if ($r['address']): ?>
-                  <p><strong>Address:</strong> <?= e($r['address']) ?>, <?= e($r['city']) ?>, <?= e($r['postal_code']) ?></p>
-                <?php endif; ?>
-                <?php if ($r['accessories']): ?>
-                  <p><strong>Accessories:</strong> <?= e($r['accessories']) ?></p>
-                <?php endif; ?>
+              <div style="display:flex; gap:24px; margin-top:12px; flex-wrap:wrap;">
+                <!-- Left: Text Details -->
+                <div style="flex:1; min-width:300px;">
+                  <p><strong>Issue:</strong> <?= nl2br(e($r['issue_description'])) ?></p>
+                  <p><strong>Service:</strong> <?= e(ucfirst($r['service_type'])) ?> •
+                     <strong>Contact:</strong> <?= e($r['preferred_contact']) ?></p>
+                  <?php if ($r['address']): ?>
+                    <p><strong>Address:</strong> <?= e($r['address']) ?>, <?= e($r['city']) ?>, <?= e($r['postal_code']) ?></p>
+                  <?php endif; ?>
+                  <?php if ($r['accessories']): ?>
+                    <p><strong>Accessories:</strong> <?= e($r['accessories']) ?></p>
+                  <?php endif; ?>
 
-                <h4 style="margin:1rem 0 0.5rem; font-size:1rem;">Timeline</h4>
-                <ol class="timeline">
-                  <?php foreach ($history as $ev): ?>
-                    <li class="timeline-item">
-                      <div><strong><?= e($ev['status']) ?></strong></div>
-                      <?php if ($ev['note']): ?>
-                        <div style="font-size:0.9rem; margin-top:2px;"><?= e($ev['note']) ?></div>
-                      <?php endif; ?>
-                      <div class="timeline-date">
-                        <?= (new DateTime($ev['created_at']))->format('M j, g:i A') ?>
-                      </div>
-                    </li>
-                  <?php endforeach; ?>
-                </ol>
+                  <h4 style="margin:1rem 0 0.75rem; font-size:1rem;">Timeline</h4>
+                  <ol class="timeline">
+                    <?php foreach ($history as $ev): ?>
+                      <li class="timeline-item">
+                        <div><strong><?= e($ev['status']) ?></strong></div>
+                        <?php if ($ev['note']): ?>
+                          <div style="font-size:0.9rem; margin-top:2px;"><?= e($ev['note']) ?></div>
+                        <?php endif; ?>
+                        <div class="timeline-date">
+                          <?= (new DateTime($ev['created_at']))->format('M j, g:i A') ?>
+                        </div>
+                      </li>
+                    <?php endforeach; ?>
+                  </ol>
+                </div>
+
+                <!-- Right: Attachments -->
+                <div style="flex:1; min-width:200px;">
+                  <h4 style="margin:0 0 0.75rem; font-size:1rem;">Photos & Files</h4>
+                  <?php if (empty($attachments)): ?>
+                    <span class="no-attachments">No files attached.</span>
+                  <?php else: ?>
+                    <div class="attachments-grid">
+                      <?php foreach ($attachments as $attachment): ?>
+                        <?php
+                          $file_path = $attachment['file_path'];
+                          $file_type = strtolower($attachment['file_type']);
+                          $full_url = get_file_url($file_path);
+                          $filename = basename($file_path);
+                          $is_image = is_image_type($file_type);
+                          $is_video = is_video_type($file_type);
+                        ?>
+                        <div class="attachment-item"
+                             onclick="openLightbox('<?= e(addslashes($full_url)) ?>', '<?= e(addslashes($filename)) ?>', '<?= $is_image ? 'image' : ($is_video ? 'video' : 'file') ?>')"
+                             title="Click to view: <?= e($filename) ?>">
+                          <?php if ($is_image): ?>
+                            <img src="<?= e($full_url) ?>" alt="Image: <?= e($filename) ?>" loading="lazy">
+                          <?php elseif ($is_video): ?>
+                            <video muted playsinline>
+                              <source src="<?= e($full_url) ?>" type="video/<?= e($file_type) ?>">
+                              <div class="attachment-placeholder">🎥</div>
+                            </video>
+                          <?php else: ?>
+                            <div class="attachment-placeholder"><?= strtoupper(e($file_type)) ?></div>
+                          <?php endif; ?>
+                          <div class="attachment-filename"><?= e($filename) ?></div>
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
               </div>
             </details>
 
@@ -542,7 +596,69 @@ function get_file_url(string $file_path): string {
     <?php endif; ?>
   </main>
 
+  <!-- Lightbox Modal -->
+  <div id="lightbox" class="lightbox">
+    <button class="lightbox-close" onclick="closeLightbox()">×</button>
+    <div id="lightbox-content" class="lightbox-content"></div>
+    <div id="lightbox-filename" class="lightbox-filename"></div>
+  </div>
+
   <script>
+    const lightbox = document.getElementById('lightbox');
+    const lightboxContent = document.getElementById('lightbox-content');
+    const lightboxFilename = document.getElementById('lightbox-filename');
+
+    function openLightbox(url, filename, type) {
+      lightboxContent.innerHTML = '';
+      lightboxFilename.textContent = filename;
+
+      if (type === 'image') {
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = filename;
+        img.style.borderRadius = '12px';
+        lightboxContent.appendChild(img);
+      } else if (type === 'video') {
+        const video = document.createElement('video');
+        video.src = url;
+        video.controls = true;
+        video.autoplay = true;
+        video.muted = false;
+        video.style.borderRadius = '12px';
+        lightboxContent.appendChild(video);
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = "_blank";
+        link.textContent = `📄 View or download: ${filename}`;
+        link.style.color = 'white';
+        link.style.textDecoration = 'underline';
+        lightboxContent.appendChild(link);
+      }
+
+      lightbox.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('active');
+      document.body.style.overflow = '';
+      const video = lightboxContent.querySelector('video');
+      if (video) video.pause();
+    }
+
+    // Close on click outside
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+        closeLightbox();
+      }
+    });
+
     // Search & Filter
     const searchInput = document.getElementById('request-search');
     const statusFilter = document.getElementById('status-filter');
