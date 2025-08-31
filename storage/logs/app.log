@@ -1,0 +1,64 @@
+2025-08-21T09:52:49+02:00 [error] Undefined array key "problem_description" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\repair.php","line":128}
+2025-08-22T11:19:30+02:00 [error] Undefined array key "problem_desc" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\repair.php","line":246}
+2025-08-22T13:43:40+02:00 [error] Call to undefined function get_pending_quotes_count() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\dashboard.php","line":8}
+2025-08-22T13:43:41+02:00 [error] Call to undefined function get_pending_quotes_count() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\dashboard.php","line":8}
+2025-08-22T13:43:43+02:00 [error] Call to undefined function get_pending_quotes_count() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\dashboard.php","line":8}
+2025-08-22T14:03:41+02:00 [error] Call to undefined function csrf_make() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\request_new.php","line":142}
+2025-08-22T14:03:46+02:00 [error] Call to undefined function csrf_make() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\request_new.php","line":142}
+2025-08-22T14:04:11+02:00 [error] Call to undefined function csrf_make() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\request_new.php","line":120}
+2025-08-22T18:07:50+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\faq.php","line":367}
+2025-08-22T18:12:07+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\faq.php","line":367}
+2025-08-22T18:15:44+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+2025-08-22T18:15:47+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+2025-08-22T18:15:57+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-22T18:17:03+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-22T18:17:03+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-22T18:17:04+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-22T18:17:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-22T18:17:07+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-22T18:17:57+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-22T18:18:02+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:02+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:07+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:10:09+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:14:40+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:44+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:49+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:49+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:49+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-23T04:19:51+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
+[2025-08-25T04:11:08+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
+[2025-08-25T04:15:27+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
+[2025-08-25T04:21:05+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
+[2025-08-25T04:22:43+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
+[2025-08-25T04:31:05+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":105}
+[2025-08-25T04:31:20+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":105}
+[2025-08-25T04:44:22+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T04:44:42+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T04:56:19+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T04:56:22+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T04:57:30+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T05:36:36+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T05:38:41+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T05:40:47+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T05:41:51+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T05:48:18+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
+[2025-08-25T05:56:38+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}

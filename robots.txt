@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /customer/
+Disallow: /staff/
+Disallow: /forgot.php
+Disallow: /login.php
+Disallow: /register.php
+Disallow: /reset.php
+
+Sitemap: https://yourdomain.com/sitemap.xml

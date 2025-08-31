@@ -1,0 +1,124 @@
+:root {
+  --bg: #f9fafb;
+  --fg: #111827;
+  --card: #ffffff;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --field: #e0f7ff;        /* light sky blue for inputs/selects */
+  --field-border: #cbd5e1;
+  --brand: #2563eb;
+  --danger: #dc2626;
+  --line: #d1d5db;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --fg: #e5e7eb;
+    --card: #111827;
+    --muted: #94a3b8;
+    --border: #1f2937;
+    --field: #0f172a;       /* dark-friendly field color */
+    --field-border: #243244;
+  }
+}
+
+/* Page frame */
+body { background:var(--bg); color:var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+main { max-width: 960px; margin: 2rem auto; padding: 1rem; }
+h2 { margin-bottom: 1rem; }
+
+/* Cards */
+.card { background:var(--card); border-radius:12px; padding:1rem; border:1px solid var(--border); }
+
+/* Forms */
+form.mini-form label { display:block; font-weight:600; margin-bottom:4px; }
+form.mini-form input,
+form.mini-form select,
+form.mini-form textarea {
+  width:100%;
+  padding:.65rem .75rem;
+  border:1px solid var(--field-border);
+  border-radius:10px;
+  background:var(--field);       /* match page scheme */
+  color:var(--fg);
+}
+
+/* Make dropdowns match the page (requested) */
+form.mini-form select {
+  appearance: none;
+  background-image:
+     linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+     linear-gradient(135deg, var(--muted) 50%, transparent 50%),
+     linear-gradient(to right, transparent, transparent);
+  background-position:
+     calc(100% - 20px) calc(50% - 3px),
+     calc(100% - 14px) calc(50% - 3px),
+     100% 0;
+  background-size: 6px 6px, 6px 6px, 2.5rem 100%;
+  background-repeat: no-repeat;
+}
+
+/* Focus states */
+form.mini-form input:focus,
+form.mini-form select:focus,
+form.mini-form textarea:focus {
+  border-color: var(--brand);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.35);
+}
+
+/* Autofill fix */
+input:-webkit-autofill,
+select:-webkit-autofill,
+textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--fg);
+  -webkit-box-shadow: 0 0 0 30px var(--field) inset;
+  box-shadow: 0 0 0 30px var(--field) inset;
+}
+
+/* Layout helpers */
+.grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.grid-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+.actions { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-top:8px; }
+
+@media (max-width:1000px){ .grid-4{grid-template-columns:1fr 1fr} }
+@media (max-width:760px){ .grid-4,.grid-3,.grid-2{grid-template-columns:1fr} }
+
+/* Chips */
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px }
+.chip {
+  border:1px solid var(--field-border);
+  border-radius:999px;
+  padding:6px 12px;
+  cursor:pointer;
+  user-select:none;
+  background:#f1f5f9;
+  color:#0f172a;
+}
+.chip:hover { background:rgba(0,0,0,.05); }
+@media (prefers-color-scheme: dark) {
+  .chip { background:#122334; color:#e5e7eb; border-color:#243244; }
+  .chip:hover{ background:#0f2030; }
+}
+.chip.active { background: var(--brand); color:#fff; border-color: var(--brand); }
+
+/* Modal */
+#customerModal {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.55); backdrop-filter: blur(2px);
+  align-items:center; justify-content:center; z-index:1000;
+}
+#customerModal .box {
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width:100%; max-width:460px; padding:22px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+  transform: translateY(-40px);
+  opacity:0;
+  transition: all .35s ease;
+}
+#customerModal.show .box { transform: translateY(0); opacity:1; }
+#c_error { color: var(--danger); font-size:.9em; min-height:1.2em; }
