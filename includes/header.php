@@ -133,9 +133,9 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
       animation: fadeIn 0.2s ease forwards;
     }
     /* Show the dropdown menu when the parent has the 'show' class */
-.dropdown.show .dropdown-content {
-  display: block;
-}
+    .dropdown.show .dropdown-content {
+      display: block;
+    }
 
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-10px); }
@@ -299,11 +299,11 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
       .nav, .auth .hello, .auth .btn.subtle {
         display: none;
       }
-      
+
       .menu-toggle {
         display: block !important;
       }
-      
+
       .mobile-menu.active {
         display: flex;
       }
@@ -388,7 +388,7 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
             </span>
           <?php endif; ?>
       </a>
-    <?php elseif (!empty($_SESSION['user']) && $_SESSION['user']['role'] === 'staff'): ?>
+    <?php elseif (!empty($_SESSION['user']) && ($_SESSION['user']['role'] === 'staff' || $_SESSION['user']['role'] === 'admin')): ?>
       <a href="<?= e(base_url('staff/dashboard.php')) ?>" style="color:var(--brand); text-decoration:none;">Dashboard</a>
       <a href="<?= e(base_url('staff/request_new.php')) ?>" style="color:var(--muted); text-decoration:none;">New Ticket</a>
       <a href="<?= e(base_url('staff/registration.php')) ?>" style="color:var(--muted); text-decoration:none;">Registration</a>
@@ -458,14 +458,24 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
               <div class="user-role"><?= ucfirst(e($_SESSION['user']['role'])) ?></div>
             </div>
           </div>
-          <a href="<?= e(base_url('customer/profile.php')) ?>">
+          <!-- Dynamically link to staff or customer profile -->
+          <?php if ($_SESSION['user']['role'] === 'staff' || $_SESSION['user']['role'] === 'admin'): ?>
+            <a href="<?= e(base_url('staff/profile.php')) ?>">
+          <?php else: // customer ?>
+            <a href="<?= e(base_url('customer/profile.php')) ?>">
+          <?php endif; ?>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
             Edit Profile
           </a>
-          <a href="<?= e(base_url('customer/change_password.php')) ?>">
+          <!-- Dynamically link to staff or customer change password -->
+          <?php if ($_SESSION['user']['role'] === 'staff' || $_SESSION['user']['role'] === 'admin'): ?>
+            <a href="<?= e(base_url('staff/change_password.php')) ?>">
+          <?php else: // customer ?>
+            <a href="<?= e(base_url('customer/change_password.php')) ?>">
+          <?php endif; ?>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
@@ -513,7 +523,13 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
 <div class="mobile-menu" id="mobileMenu">
   <div class="mobile-menu-header">
     <div class="brand">
-      <a href="<?= e(base_url('customer/dashboard.php')) ?>" style="display:flex; align-items:center; gap:8px; text-decoration:none;">
+      <?php if (!empty($_SESSION['user']) && $_SESSION['user']['role'] === 'staff'): ?>
+        <a href="<?= e(base_url('staff/dashboard.php')) ?>" style="display:flex; align-items:center; gap:8px; text-decoration:none;">
+      <?php elseif (!empty($_SESSION['user']) && $_SESSION['user']['role'] === 'customer'): ?>
+        <a href="<?= e(base_url('customer/dashboard.php')) ?>" style="display:flex; align-items:center; gap:8px; text-decoration:none;">
+      <?php else: ?>
+        <a href="<?= e(base_url('index.php')) ?>" style="display:flex; align-items:center; gap:8px; text-decoration:none;">
+      <?php endif; ?>
         <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
              fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
              style="width:28px; height:28px;">
@@ -540,7 +556,7 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
     </div>
     <button class="close-menu" id="closeMenu">&times;</button>
   </div>
-  
+
   <div class="mobile-nav">
     <?php if (!empty($_SESSION['user']) && $_SESSION['user']['role'] === 'customer'): ?>
       <a href="<?= e(base_url('customer/dashboard.php')) ?>">Dashboard</a>
@@ -550,13 +566,16 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
       <a href="<?= e(base_url('customer/notifications.php')) ?>">Notifications</a>
       <a href="<?= e(base_url('customer/profile.php')) ?>">Edit Profile</a>
       <a href="<?= e(base_url('customer/change_password.php')) ?>">Change Password</a>
-    <?php elseif (!empty($_SESSION['user']) && $_SESSION['user']['role'] === 'staff'): ?>
+    <?php elseif (!empty($_SESSION['user']) && ($_SESSION['user']['role'] === 'staff' || $_SESSION['user']['role'] === 'admin')): ?>
       <a href="<?= e(base_url('staff/dashboard.php')) ?>">Dashboard</a>
       <a href="<?= e(base_url('staff/request_new.php')) ?>">New Ticket</a>
       <a href="<?= e(base_url('staff/registration.php')) ?>">Registration</a>
       <a href="<?= e(base_url('staff/repair.php')) ?>">Repair</a>
       <a href="<?= e(base_url('staff/billing.php')) ?>">Billing</a>
       <a href="<?= e(base_url('staff/shipping.php')) ?>">Shipping</a>
+      <!-- Dynamically link to staff profile and change password in mobile menu -->
+      <a href="<?= e(base_url('staff/profile.php')) ?>">Edit Profile</a>
+      <a href="<?= e(base_url('staff/change_password.php')) ?>">Change Password</a>
     <?php else: ?>
       <a href="<?= e(base_url('index.php#services')) ?>">Services</a>
       <a href="<?= e(base_url('index.php#how')) ?>">How it works</a>
@@ -564,7 +583,7 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
       <a href="<?= e(base_url('index.php#contact')) ?>">Contact</a>
     <?php endif; ?>
   </div>
-  
+
   <div class="mobile-auth">
     <?php if (!empty($_SESSION['user'])): ?>
       <a href="<?= e(base_url('logout.php')) ?>" class="btn-login">Logout</a>
@@ -637,7 +656,7 @@ define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIR
     const userDropdown = document.getElementById('userDropdown');
     if (userDropdown) {
       const userAvatarTrigger = userDropdown.querySelector('.user-menu-trigger');
-      
+
       userAvatarTrigger.addEventListener('click', function(e) {
         e.stopPropagation();
         userDropdown.classList.toggle('show');
