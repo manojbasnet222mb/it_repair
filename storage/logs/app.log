@@ -11,3 +11,4 @@
 [2025-09-03T09:18:50+02:00] [debug] Successfully saved image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7ebd98eac70.15449189.png
 [2025-09-03T12:50:36+02:00] [debug] Attempting to save image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b81d7c4554e3.79829093.png
 [2025-09-03T12:50:36+02:00] [debug] Successfully saved image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b81d7c4554e3.79829093.png
+[2025-09-03T16:22:04+02:00] [error] require_once(C:\xampp\htdocs\it_repair\public\customer/../../vendor/autoload.php): Failed to open stream: No such file or directory {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\pay_invoice.php","line":18}

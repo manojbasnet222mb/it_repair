@@ -1,11 +1,42 @@
 <?php
+/**
+ * Staff Repair Desk — NexusFix (Professional Edition)
+ * Inspired by top-tier UX/UI design principles.
+ * Features: Tabbed views, responsive cards, inline editing, parts listing, quote management, timeline.
+ * Enhanced with: Consistent dark/light mode, improved visual hierarchy, streamlined actions,
+ *                Attachment previews, Expandable problem list, Collapsible sections.
+ */
+declare(strict_types=1);
 require_once __DIR__.'/../../includes/bootstrap.php';
 require_role('staff','admin');
 
 $note = null;
 $errors = [];
 
-// --- Helpers ---------------------------------------------------------------
+// --- Attachment Helpers (Copied from customer/requests.php) ---
+function get_request_attachments(int $request_id): array {
+    $stmt = db()->prepare("SELECT file_path, file_type FROM request_attachments WHERE request_id = ? ORDER BY uploaded_at ASC");
+    $stmt->execute([$request_id]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+function is_image_type(string $file_type): bool {
+    $image_types = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    return in_array(strtolower($file_type), $image_types);
+}
+function is_video_type(string $file_type): bool {
+    $video_types = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+    return in_array(strtolower($file_type), $video_types);
+}
+function get_file_url(string $file_path): string {
+    // Assumes base URL structure like http://localhost/it_repair/
+    // and file paths stored like uploads/requests/123/filename.ext
+    $base = rtrim(dirname(base_url()), '/'); // Gets path part before /public, e.g., /it_repair
+    return $base . '/' . ltrim($file_path, '/'); // Combine base with stored path
+}
+
+// --- End Attachment Helpers ---
+
+// --- Existing Helpers ---------------------------------------------------------------
 function get_invoice($rid){
   $s = db()->prepare("SELECT * FROM invoices WHERE request_id=?");
   $s->execute([$rid]);
@@ -46,7 +77,7 @@ function history_for($rid){
 // --- POST actions ----------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!csrf_verify($_POST['csrf'] ?? '')) {
-    $errors['csrf'] = 'Invalid token';
+    $errors['csrf'] = 'Invalid session token. Please refresh the page.';
   } else {
     $act = $_POST['act'] ?? '';
     $rid = (int)($_POST['rid'] ?? 0);
@@ -56,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $reqStmt->execute([$rid]);
     $req = $reqStmt->fetch();
     if(!$req){
-      $errors['req'] = 'Request not found';
+      $errors['req'] = 'Request not found.';
     }
 
     if(!$errors){
@@ -66,18 +97,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Add Part
       if ($act === 'addpart') {
         if(!$isInRepair){
-          $errors['status'] = 'Cannot modify parts once not In Repair.';
+          $errors['status'] = 'Cannot modify parts unless the request is In Repair.';
         } else {
           $item = trim($_POST['item'] ?? '');
           $unit = trim($_POST['unit'] ?? 'pcs');
           $qty  = (float)($_POST['qty'] ?? 1);
           $remarks = trim($_POST['remarks'] ?? '');
-          if (!$item) $errors['item'] = 'Item required';
-          if ($qty <= 0) $errors['qty'] = 'Qty must be > 0';
+          if (!$item) $errors['item'] = 'Item name is required.';
+          if ($qty <= 0) $errors['qty'] = 'Quantity must be greater than 0.';
           if (!$errors) {
             $s = db()->prepare("INSERT INTO request_parts (request_id,item,unit,qty,remarks,added_by) VALUES (?,?,?,?,?,?)");
             $s->execute([$rid,$item,$unit,$qty,$remarks,$userId]);
-            $note = 'Part added.';
+            $note = 'Part added successfully.';
           }
         }
       }
@@ -85,13 +116,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Remove Part
       if (!$errors && $act === 'delpart') {
         if(!$isInRepair){
-          $errors['status'] = 'Cannot remove parts once not In Repair.';
+          $errors['status'] = 'Cannot remove parts unless the request is In Repair.';
         } else {
           $pid = (int)($_POST['pid'] ?? 0);
           if ($pid) {
             $s = db()->prepare("DELETE FROM request_parts WHERE id=? AND request_id=?");
             $s->execute([$pid,$rid]);
-            $note = 'Part removed.';
+            $note = 'Part removed successfully.';
           }
         }
       }
@@ -102,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $model = trim($_POST['model'] ?? '');
         $serial= trim($_POST['serial_no'] ?? '');
         if(!$brand || !$model || !$serial){
-          $errors['device'] = 'Brand, Model and Serial/IMEI are required.';
+          $errors['device'] = 'Brand, Model, and Serial/IMEI are all required.';
         } else {
           $s = db()->prepare("UPDATE repair_requests SET brand=?, model=?, serial_no=? WHERE id=?");
           $s->execute([$brand,$model,$serial,$rid]);
@@ -114,18 +145,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$errors && $act === 'add_note') {
         $n = trim($_POST['note_text'] ?? '');
         if(!$n){
-          $errors['note_text'] = 'Note cannot be empty';
+          $errors['note_text'] = 'Note content cannot be empty.';
         } else {
           $cur = $req['status'];
           add_history($rid,$cur,'Technician note: '.$n,$userId);
-          $note = 'Note added to timeline.';
+          $note = 'Note added to the timeline.';
         }
       }
 
       // Generate Quote
       if (!$errors && $act === 'generate_quote') {
         if(!$isInRepair){
-          $errors['status'] = 'Can only generate quote while In Repair.';
+          $errors['status'] = 'Quotes can only be generated while the request is In Repair.';
         } else {
           $pdo = db();
           $pdo->beginTransaction();
@@ -135,11 +166,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $s->execute([$invoice['id']]);
             add_history($rid,'In Repair','Quote generated (Pending approval)',$userId);
             $pdo->commit();
-            $note = 'Quote generated (Pending approval).';
+            $note = 'Quote generated and is now pending approval.';
           } catch(Exception $e){
             $pdo->rollBack();
-            $errors['quote'] = 'Failed to generate quote.';
-            error_log($e->getMessage());
+            $errors['quote'] = 'Failed to generate the quote. Please try again.';
+            error_log("Quote Generation Error (RID: $rid): " . $e->getMessage());
           }
         }
       }
@@ -148,19 +179,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$errors && $act === 'approve_quote') {
         $iid = (int)($_POST['invoice_id'] ?? 0);
         if(!$iid){
-          $errors['invoice'] = 'Missing invoice id';
+          $errors['invoice'] = 'Missing invoice ID.';
         } else {
           $inv = db()->prepare("SELECT * FROM invoices WHERE id=? AND request_id=?");
           $inv->execute([$iid,$rid]);
           $invoice = $inv->fetch();
           if(!$invoice){
-            $errors['invoice'] = 'Invoice not found';
+            $errors['invoice'] = 'Invoice not found.';
           } elseif($invoice['quote_status'] !== 'Pending'){
-            $errors['invoice'] = 'Only pending quotes can be approved';
+            $errors['invoice'] = 'Only pending quotes can be approved.';
           } else {
             db()->prepare("UPDATE invoices SET quote_status='Approved' WHERE id=?")->execute([$iid]);
             add_history($rid,'In Repair','Quote approved',$userId);
-            $note = 'Quote approved.';
+            $note = 'Quote approved successfully.';
           }
         }
       }
@@ -169,15 +200,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$errors && $act === 'reject_quote') {
         $iid = (int)($_POST['invoice_id'] ?? 0);
         $reason = trim($_POST['reject_reason'] ?? '');
-        $inv = db()->prepare("SELECT * FROM invoices WHERE id=? AND request_id=?");
-        $inv->execute([$iid,$rid]);
-        $invoice = $inv->fetch();
-        if(!$invoice){
-          $errors['invoice'] = 'Invoice not found';
+        if(!$iid){
+             $errors['invoice'] = 'Missing invoice ID for rejection.';
         } else {
-          db()->prepare("UPDATE invoices SET quote_status='Rejected' WHERE id=?")->execute([$iid]);
-          add_history($rid,'In Repair','Quote rejected'.($reason?': '.$reason:''),$userId);
-          $note = 'Quote rejected.';
+            db()->prepare("UPDATE invoices SET quote_status='Rejected' WHERE id=?")->execute([$iid]);
+            $noteText = 'Quote rejected' . ($reason ? ': ' . $reason : '');
+            add_history($rid,'In Repair', $noteText ,$userId);
+            $note = 'Quote rejected.';
         }
       }
 
@@ -191,21 +220,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("UPDATE repair_requests SET status='Billed' WHERE id=?")->execute([$rid]);
             add_history($rid,'Billed','Forwarded to Billing',$userId);
             $pdo->commit();
-            $note = 'Forwarded to Billing.';
+            $note = 'Request forwarded to Billing successfully.';
           } catch(Exception $e){
             $pdo->rollBack();
-            $errors['complete'] = 'Failed to forward to Billing.';
-            error_log($e->getMessage());
+            $errors['complete'] = 'Failed to forward to Billing. Please try again.';
+            error_log("Billing Forward Error (RID: $rid): " . $e->getMessage());
           }
         } else {
-          $errors['complete'] = 'Cannot complete: Quote not approved or wrong status.';
+          $errors['complete'] = 'Cannot complete: Quote must be approved and request must be In Repair.';
         }
       }
 
       // Mark Delivered
       if (!$errors && $act === 'mark_delivered') {
         if($req['status'] !== 'Billed'){
-          $errors['deliver'] = 'Only billed requests can be delivered.';
+          $errors['deliver'] = 'Only billed requests can be marked as delivered.';
         } else {
           $pdo = db();
           $pdo->beginTransaction();
@@ -213,10 +242,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("UPDATE repair_requests SET status='Delivered' WHERE id=?")->execute([$rid]);
             add_history($rid,'Delivered','Device delivered to customer',$userId);
             $pdo->commit();
-            $note = 'Marked as Delivered.';
+            $note = 'Request marked as Delivered.';
           } catch(Exception $e){
             $pdo->rollBack();
-            $errors['deliver'] = 'Failed to mark delivered.';
+            $errors['deliver'] = 'Failed to mark as delivered. Please try again.';
+            error_log("Delivery Mark Error (RID: $rid): " . $e->getMessage());
           }
         }
       }
@@ -224,386 +254,1201 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-// --- Queries for view -------------------------------------------------------
-$rows = db()->query("SELECT rr.*, u.name cust_name, u.email cust_email, u.phone cust_phone
+// --- Queries for view (with attachments) -------------------------------------------------------
+// Fetch requests and add attachments to each
+$raw_rows = db()->query("SELECT rr.*, u.name cust_name, u.email cust_email, u.phone cust_phone
   FROM repair_requests rr
   JOIN users u ON u.id=rr.customer_id
   WHERE rr.status IN ('In Repair','Billed')
   ORDER BY rr.id DESC")->fetchAll();
 
+$rows = [];
+foreach ($raw_rows as $row) {
+    $row['attachments'] = get_request_attachments((int)$row['id']);
+    $rows[] = $row;
+}
+unset($raw_rows); // Free memory
+
 ?>
 <!doctype html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Repair Desk</title>
-
-<!-- Tailwind CDN for professional UI -->
-<script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Keep your base styles if needed -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repair Desk — NexusFix</title>
 <link rel="stylesheet" href="../../assets/css/styles.css">
-
 <style>
-  /* Utility bridges to your existing variables if present */
-  .chip{ @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium; }
-  .status-inrepair{ @apply bg-blue-100 text-blue-800; }
-  .status-billed{ @apply bg-amber-100 text-amber-800; }
-  .status-delivered{ @apply bg-emerald-100 text-emerald-800; }
-  .card{ @apply bg-white rounded-xl shadow-sm border border-gray-200; }
-  .card-header{ @apply flex items-start justify-between gap-4; }
-  .muted{ @apply text-gray-500; }
-  .btn{ @apply inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium; }
-  .btn-primary{ @apply bg-indigo-600 text-white hover:bg-indigo-700; }
-  .btn-outline{ @apply border border-gray-300 text-gray-700 hover:bg-gray-50; }
-  .btn-success{ @apply bg-emerald-600 text-white hover:bg-emerald-700; }
-  .btn-danger{ @apply bg-rose-600 text-white hover:bg-rose-700; }
-  .btn-subtle{ @apply bg-gray-100 text-gray-800 hover:bg-gray-200; }
-  details>summary::-webkit-details-marker{ display:none; }
-  details>summary{ @apply cursor-pointer select-none; }
-  .feed-dot{ @apply w-2 h-2 rounded-full bg-gray-300 mt-2; }
-  .feed-line{ @apply absolute left-[11px] top-6 bottom-0 w-[2px] bg-gray-200; }
+/* --- Theme Variables --- */
+:root {
+  --bg: #0b0c0f;
+  --card: #101218;
+  --text: #e8eaf0;
+  --muted: #a6adbb;
+  --border: #1f2430;
+  --field-border: #2a3242;
+  --primary: #60a5fa;
+  --accent: #6ee7b7;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --info: #93c5fd;
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --shadow-sm: 0 4px 12px rgba(0,0,0,.18);
+  --radius: 16px;
+  --transition: all 0.2s ease;
+}
+
+[data-theme="light"] {
+  --bg: #f7f8fb;
+  --card: #ffffff;
+  --text: #0b0c0f;
+  --muted: #5b6172;
+  --border: #e5e7eb;
+  --field-border: #cbd5e1;
+  --shadow: 0 10px 25px rgba(15,23,42,.08);
+  --shadow-sm: 0 4px 12px rgba(0,0,0,.1);
+}
+
+/* --- Base Styles --- */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 600;
+  margin-top: 0;
+}
+h1 { font-size: 1.75rem; margin-bottom: 1.5rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.1rem; }
+h4 { font-size: 1rem; margin-top: 1rem; margin-bottom: 0.5rem; }
+
+/* --- Layout & Cards --- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.card-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+/* --- Tabs --- */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.tab-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  background: var(--card);
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.tab-btn:hover {
+  background: var(--field-border);
+}
+.tab-btn.active {
+  background: linear-gradient(90deg, #6366f1, #ec4899, #f59e0b);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* --- Status Chips --- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.status-inrepair    { background: rgba(59, 130, 246, 0.15); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.3); }
+.status-billed      { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
+.status-delivered   { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+.status-pending     { background: rgba(163, 163, 163, 0.15); color: var(--muted); border: 1px solid rgba(163, 163, 163, 0.3); }
+.status-approved    { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+.status-rejected    { background: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.3); }
+
+/* --- Buttons --- */
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: rgba(255,255,255,.1);
+}
+.btn:focus-visible {
+  outline: 3px solid rgba(96, 165, 250, 0.45);
+  outline-offset: 2px;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn.primary {
+  background: var(--primary);
+  color: white;
+}
+.btn.primary:hover {
+  background: #4f9cf9;
+  transform: translateY(-1px);
+}
+.btn.outline {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--field-border);
+}
+.btn.outline:hover {
+  background: rgba(255,255,255,.06);
+}
+.btn.success {
+  background: var(--success);
+  color: white;
+}
+.btn.success:hover {
+  background: #2cbe8a;
+  transform: translateY(-1px);
+}
+.btn.danger {
+  background: var(--danger);
+  color: white;
+}
+.btn.danger:hover {
+  background: #e53e3e;
+  transform: translateY(-1px);
+}
+.btn.subtle {
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  border: 1px solid transparent;
+}
+.btn.subtle:hover {
+  background: rgba(255,255,255,.1);
+}
+
+/* --- Forms & Inputs --- */
+input, select, textarea {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+label {
+  display: block;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+  color: var(--text);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.form-group {
+    margin-bottom: 1rem;
+}
+.form-inline {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+.form-inline .btn {
+    flex-shrink: 0;
+}
+
+/* --- Messages --- */
+.alert {
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+.alert.success {
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: var(--success);
+}
+.alert.error {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--danger);
+}
+.alert ul {
+  margin: 0.5rem 0 0 1.2rem;
+  padding: 0;
+}
+
+/* --- Search --- */
+.search-input {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+/* --- Grid Layout --- */
+.grid-2 { display: grid; gap: 1.5rem; }
+.grid-2 { grid-template-columns: 1fr; }
+@media (min-width: 992px) {
+  .grid-2 { grid-template-columns: 2fr 1fr; }
+}
+
+/* --- Timeline --- */
+.timeline {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-top: 1rem;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px; /* 1rem - 6px (dot width/2) */
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--field-border);
+}
+.timeline-item {
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+.timeline-dot {
+  position: absolute;
+  left: -1.6rem; /* Adjust based on padding and dot size */
+  top: 0.3rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--card);
+  z-index: 1;
+}
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.timeline-status {
+  font-weight: 600;
+}
+.timeline-note {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.timeline-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.timeline-empty {
+    color: var(--muted);
+    font-style: italic;
+    padding-left: 1rem;
+}
+
+/* --- Tables --- */
+.parts-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+.parts-table th {
+  text-align: left;
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--field-border);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.parts-table td {
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--field-border);
+}
+.parts-table tr:last-child td {
+  border-bottom: none;
+}
+.parts-table .actions-cell {
+  text-align: right;
+}
+
+/* --- Sections --- */
+.section-title {
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.highlight-box {
+    background: rgba(251, 191, 36, 0.1); /* Amber 100 equivalent */
+    border: 1px solid rgba(251, 191, 36, 0.3); /* Amber 200 equivalent */
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.highlight-box .section-title {
+    color: var(--warning); /* Amber 500 equivalent */
+    margin-top: 0;
+}
+.problem-list {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0.5rem 0 0;
+    max-height: 200px; /* Optional: Add scroll if list is long */
+    overflow-y: auto;   /* Optional: Add scroll if list is long */
+}
+.problem-list li {
+    padding: 0.25rem 0;
+    border-bottom: 1px dotted var(--field-border);
+}
+.problem-list li:last-child {
+    border-bottom: none;
+}
+
+/* --- Dropdown for Problem List (Custom) --- */
+.problem-dropdown-trigger {
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.problem-dropdown-trigger:hover {
+    color: var(--text);
+    text-decoration: underline;
+}
+.problem-list-dropdown {
+    list-style-type: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+    background-color: var(--card);
+    border: 1px solid var(--field-border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+    max-height: 200px; /* Optional: Add scroll */
+    overflow-y: auto;   /* Optional: Add scroll */
+    z-index: 10; /* Ensure it appears above other content */
+}
+.problem-list-dropdown li {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px dotted var(--field-border);
+    font-size: 0.9rem;
+}
+.problem-list-dropdown li:last-child {
+    border-bottom: none;
+}
+.problem-list-dropdown li:hover {
+    background-color: var(--field-border);
+}
+/* --- End Dropdown for Problem List --- */
+
+/* --- Attachments (from customer/requests.php) --- */
+.attachments-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 0.75rem;
+}
+.attachment-item {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--field-border);
+    background-color: var(--card);
+    cursor: pointer;
+}
+.attachment-item img,
+.attachment-item video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s ease;
+}
+.attachment-item:hover img,
+.attachment-item:hover video {
+    transform: scale(1.05);
+}
+.attachment-item video {
+    background: #111;
+}
+.attachment-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: var(--field-border);
+    color: var(--muted);
+    font-size: 0.6rem;
+    font-weight: bold;
+}
+.attachment-filename {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    font-size: 0.55rem;
+    padding: 2px 4px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.no-attachments {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-style: italic;
+    margin-top: 0.5rem;
+}
+/* --- Lightbox Modal (from customer/requests.php) --- */
+.lightbox {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.9);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+.lightbox.active {
+  display: flex;
+}
+.lightbox-content {
+  max-width: 90vw;
+  max-height: 85vh;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+}
+.lightbox-content img,
+.lightbox-content video {
+  max-width: 100%;
+  max-height: 80vh;
+  display: block;
+}
+.lightbox-video {
+  background: #000;
+}
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  font-size: 1.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+}
+.lightbox-close:hover {
+  background: rgba(255,255,255,0.3);
+}
+.lightbox-filename {
+  margin-top: 10px;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+/* --- Collapsible Sections --- */
+.expand-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.expand-btn:hover {
+  background: rgba(96, 165, 250, 0.1);
+}
+.expand-icon {
+  transition: transform 0.3s ease;
+}
+.expand-icon.rotated {
+  transform: rotate(180deg);
+}
+.collapsible-content {
+  display: none;
+  padding-top: 1rem;
+  border-top: 1px solid var(--field-border);
+  margin-top: 1rem;
+}
+.collapsible-content.active {
+  display: block;
+}
+/* --- End Collapsible Sections --- */
+
+
+/* --- Utils --- */
+.muted { color: var(--muted); }
+.text-sm { font-size: 0.9rem; }
+.text-xs { font-size: 0.8rem; }
+.font-medium { font-weight: 500; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.hidden { display: none; }
+.w-full { width: 100%; }
+.mb-4 { margin-bottom: 1rem; }
+.mt-4 { margin-top: 1rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.mb-6 { margin-bottom: 1.5rem; } /* Added for spacing */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 </style>
 </head>
 
-<body class="bg-gray-50">
+<body>
 <?php require __DIR__.'/../../includes/header.php'; ?>
 
-<main class="max-w-6xl mx-auto px-4 py-6">
-  <div class="mb-6">
-    <h1 class="text-2xl font-semibold text-gray-900">Repair Desk</h1>
-    <?php if($note): ?><div class="mt-3 rounded-lg bg-emerald-50 text-emerald-700 px-4 py-2 border border-emerald-200"><?= e($note) ?></div><?php endif; ?>
+<main aria-labelledby="page-title">
+  <div>
+    <h1 id="page-title">Repair Desk</h1>
+    <?php if($note): ?>
+        <div class="alert success" role="alert">
+            <strong>Success:</strong> <?= e($note) ?>
+        </div>
+    <?php endif; ?>
     <?php if($errors): ?>
-      <div class="mt-3 rounded-lg bg-rose-50 text-rose-700 px-4 py-2 border border-rose-200">
-        <?php foreach($errors as $m): ?><div><?= e($m) ?></div><?php endforeach; ?>
-      </div>
+        <div class="alert error" role="alert">
+            <strong>Please fix the following:</strong>
+            <ul>
+                <?php foreach($errors as $key => $m): ?>
+                    <?php if ($key !== 'csrf'): // Don't show CSRF error inline ?>
+                        <li><?= e($m) ?></li>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </ul>
+            <?php if (!empty($errors['csrf'])): ?>
+                <p style="margin-top: 0.5rem;"><?= e($errors['csrf']) ?></p>
+            <?php endif; ?>
+        </div>
     <?php endif; ?>
   </div>
 
   <!-- Tabs -->
-  <div class="flex flex-wrap gap-2 mb-4">
-    <button class="tab-btn btn btn-subtle data-[active=true]:bg-indigo-600 data-[active=true]:text-white" data-tab="inrepair" data-active="true">🔧 In Repair</button>
-    <button class="tab-btn btn btn-subtle" data-tab="billed">💸 Ready for Billing / Billed</button>
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="inrepair" role="tab" aria-selected="true">🔧 In Repair</button>
+    <button class="tab-btn" data-tab="billed" role="tab" aria-selected="false">💸 Ready for Billing / Billed</button>
   </div>
 
   <!-- In Repair -->
-  <section id="inrepair" class="tab-content block">
-    <input type="text" class="search-input w-full rounded-lg border border-gray-300 px-3 py-2 mb-4" placeholder="🔎 Search (ticket, device, customer, parts, notes)" data-target="list-inrepair">
-    <div id="list-inrepair" class="grid gap-4">
+  <section id="inrepair" class="tab-content active" role="tabpanel" aria-labelledby="tab-inrepair">
+    <input type="text" class="search-input" placeholder="🔎 Search (ticket, device, customer, parts, notes)" data-target="list-inrepair" aria-label="Search In Repair requests">
+    <div id="list-inrepair">
       <?php foreach($rows as $r): if($r['status']!== 'In Repair') continue;
         $plist   = parts_for($r['id']);
         $invoice = get_invoice($r['id']);
         $history = history_for($r['id']);
-        $problem = $r['problem'] ?? ($r['problem_reported'] ?? ($r['issue'] ?? ($r['notes'] ?? '')));
+        // Fallback chain for problem description
+        $problemText = $r['problem'] ?? ($r['problem_reported'] ?? ($r['issue_description'] ?? ($r['notes'] ?? '')));
+        // Parse problem list (assuming '; ' separator)
+        $problemList = $problemText ? array_map('trim', explode(';', $problemText)) : [];
+        // Filter out empty items that might result from trailing ';'
+        $problemList = array_filter($problemList, fn($item) => !empty($item));
       ?>
-      <article class="card searchable p-5" data-rid="<?= e($r['id']) ?>">
-        <!-- Header -->
+      <article class="card searchable" data-rid="<?= e($r['id']) ?>"
+        data-ticket="<?= strtolower(e($r['ticket_code'])) ?>"
+        data-device="<?= strtolower(e($r['device_type'])) ?>"
+        data-brand="<?= strtolower(e($r['brand'] ?? '')) ?>"
+        data-model="<?= strtolower(e($r['model'] ?? '')) ?>"
+        data-customer="<?= strtolower(e($r['cust_name'])) ?>">
+        <!-- Header (Always Visible) -->
         <div class="card-header">
           <div>
-            <div class="flex flex-wrap items-center gap-2">
-              <h2 class="text-lg font-semibold text-gray-900"><?= e($r['ticket_code']) ?></h2>
-              <?php
-                $status = $r['status'];
-                $statusClass = 'status-inrepair';
-                if($status==='Billed') $statusClass='status-billed';
-                if($status==='Delivered') $statusClass='status-delivered';
-              ?>
-              <span class="chip <?= $statusClass ?>"><?= e($status) ?></span>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2><?= e($r['ticket_code']) ?></h2>
+              <span class="chip status-inrepair"><?= e($r['status']) ?></span>
               <?php if($invoice): ?>
-                <span class="chip bg-gray-100 text-gray-800">Invoice #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span>
+                <?php
+                    $quoteStatusClass = 'status-pending';
+                    if ($invoice['quote_status'] === 'Approved') $quoteStatusClass = 'status-approved';
+                    if ($invoice['quote_status'] === 'Rejected') $quoteStatusClass = 'status-rejected';
+                ?>
+                <span class="chip <?= $quoteStatusClass ?>">Quote #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span>
               <?php endif; ?>
             </div>
-            <div class="mt-1 text-sm text-gray-600">
-              <?= e($r['device_type']) ?><?= $r['brand']?' · '.e($r['brand']):'' ?><?= $r['model']?' · '.e($r['model']):'' ?>
+            <div class="text-sm muted mt-1">
+              <?= e($r['device_type']) ?><?= $r['brand']?' · <span class="font-medium">'.e($r['brand']).'</span>':'' ?><?= $r['model']?' · <span class="font-medium">'.e($r['model']).'</span>':'' ?>
             </div>
-            <div class="mt-1 text-sm muted">
-              Customer: <span class="font-medium text-gray-800"><?= e($r['cust_name']) ?></span> • <?= e($r['cust_email']) ?><?= $r['cust_phone']?' • '.e($r['cust_phone']):'' ?>
+            <div class="text-sm muted mt-1">
+              Customer: <span class="font-medium"><?= e($r['cust_name']) ?></span> • <?= e($r['cust_email']) ?><?= $r['cust_phone']?' • '.e($r['cust_phone']):'' ?>
             </div>
           </div>
-
-          <!-- Action Toolbar -->
-          <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-            <form method="post">
-              <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-              <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-              <button class="btn btn-primary" name="act" value="generate_quote">Generate Quote</button>
-            </form>
-
-            <?php if($invoice && $invoice['quote_status'] === 'Pending'): ?>
-              <form method="post">
-                <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                <input type="hidden" name="invoice_id" value="<?= e($invoice['id']) ?>">
-                <button class="btn btn-success" name="act" value="approve_quote">Approve Quote</button>
-              </form>
-              <form method="post" onsubmit="return confirm('Reject this quote?');" class="flex gap-2">
-                <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                <input type="hidden" name="invoice_id" value="<?= e($invoice['id']) ?>">
-                <input name="reject_reason" class="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Reason (optional)">
-                <button class="btn btn-outline" name="act" value="reject_quote">Reject</button>
-              </form>
-            <?php endif; ?>
-
-            <?php if($invoice && $invoice['quote_status'] === 'Approved'): ?>
-              <form method="post" onsubmit="return confirm('Send to Billing?');">
-                <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                <button class="btn btn-primary" name="act" value="complete">Send to Billing</button>
-              </form>
-            <?php endif; ?>
-          </div>
+          <button class="expand-btn" type="button" data-target="#collapsible-<?= e($r['id']) ?>">
+              <span>Expand Details</span>
+              <span class="expand-icon">▼</span>
+          </button>
         </div>
 
-        <div class="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <!-- Collapsible Content -->
+        <div id="collapsible-<?= e($r['id']) ?>" class="collapsible-content">
+        <div class="grid-2">
           <!-- Left column -->
-          <div class="space-y-5 lg:col-span-2">
+          <div>
+
+            <!-- Action Toolbar -->
+            <div class="card mb-4">
+              <h3 class="section-title">Actions</h3>
+              <div class="flex flex-wrap gap-2">
+                <form method="post">
+                  <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                  <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
+                  <button class="btn primary" name="act" value="generate_quote">Generate Quote</button>
+                </form>
+
+                <?php if($invoice && $invoice['quote_status'] === 'Pending'): ?>
+                  <form method="post">
+                    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
+                    <input type="hidden" name="invoice_id" value="<?= e($invoice['id']) ?>">
+                    <button class="btn success" name="act" value="approve_quote">Approve Quote</button>
+                  </form>
+                  <form method="post" class="form-inline">
+                    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
+                    <input type="hidden" name="invoice_id" value="<?= e($invoice['id']) ?>">
+                    <input name="reject_reason" placeholder="Reason (optional)" aria-label="Reject reason">
+                    <button class="btn outline" name="act" value="reject_quote" onclick="return confirm('Are you sure you want to reject this quote?');">Reject</button>
+                  </form>
+                <?php endif; ?>
+
+                <?php if($invoice && $invoice['quote_status'] === 'Approved'): ?>
+                  <form method="post" onsubmit="return confirm('Send this request to Billing?');">
+                    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
+                    <button class="btn primary" name="act" value="complete">Send to Billing</button>
+                  </form>
+                <?php endif; ?>
+              </div>
+            </div>
 
             <!-- Problem Reported -->
-            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <div class="text-xs font-semibold uppercase tracking-wide text-amber-700">Problem Reported</div>
-              <div class="mt-1 text-sm text-amber-900 whitespace-pre-line"><?= $problem ? e($problem) : '<span class="opacity-60">No problem described.</span>' ?></div>
+            <div class="highlight-box">
+              <h3 class="section-title">⚠️ Problem Reported</h3>
+              <?php if ($problemText): ?>
+                <?php if (!empty($problemList) && count($problemList) > 1): ?>
+                    <!-- Show full text and dropdown list if multiple issues -->
+                    <div class="text-sm mb-2"><?= nl2br(e($problemText)) ?></div>
+                    <!-- Dropdown Container -->
+                    <div class="relative">
+                        <!-- Summary acts as the dropdown trigger -->
+                        <div class="problem-dropdown-trigger" onclick="toggleProblemList(this, '<?= e($r['id']) ?>')">
+                            Show individual issues <span id="dropdown-icon-<?= e($r['id']) ?>">▼</span>
+                        </div>
+                        <!-- Hidden List (initially) -->
+                        <ul id="problem-list-<?= e($r['id']) ?>" class="problem-list-dropdown hidden">
+                            <?php foreach ($problemList as $issue): ?>
+                                <li><?= e($issue) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php else: ?>
+                    <!-- Show full text if single issue or parsing failed -->
+                    <div class="text-sm"><?= nl2br(e($problemText)) ?></div>
+                <?php endif; ?>
+              <?php else: ?>
+                <div class="text-sm muted">No problem description provided.</div>
+              <?php endif; ?>
             </div>
 
             <!-- Device Details -->
-            <div class="card p-4">
-              <div class="flex items-center justify-between">
-                <h3 class="font-semibold text-gray-900">Device Details</h3>
-                <button class="btn btn-outline toggle-edit" data-target="#devform-<?= e($r['id']) ?>">Edit</button>
+            <div class="card">
+              <div class="card-header">
+                <h3 class="section-title">🖥️ Device Details</h3>
+                <button class="btn outline toggle-edit" data-target="#devform-<?= e($r['id']) ?>">✎ Edit</button>
               </div>
 
-              <!-- Read mode -->
-              <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+              <!-- Read-only display -->
+              <div class="form-row">
                 <div>
-                  <div class="text-xs uppercase muted">Brand</div>
-                  <div class="text-gray-900 font-medium"><?= e($r['brand']) ?: '—' ?></div>
+                  <label>Brand</label>
+                  <div class="text-sm"><?= e($r['brand']) ?: '—' ?></div>
                 </div>
                 <div>
-                  <div class="text-xs uppercase muted">Model</div>
-                  <div class="text-gray-900 font-medium"><?= e($r['model']) ?: '—' ?></div>
+                  <label>Model</label>
+                  <div class="text-sm"><?= e($r['model']) ?: '—' ?></div>
                 </div>
                 <div>
-                  <div class="text-xs uppercase muted">Serial / IMEI</div>
-                  <div class="text-gray-900 font-medium"><?= e($r['serial_no']) ?: '—' ?></div>
+                  <label>Serial / IMEI</label>
+                  <div class="text-sm"><?= e($r['serial_no']) ?: '—' ?></div>
                 </div>
                 <div>
-                  <div class="text-xs uppercase muted">Device Type</div>
-                  <div class="text-gray-900 font-medium"><?= e($r['device_type']) ?: '—' ?></div>
+                  <label>Device Type</label>
+                  <div class="text-sm"><?= e($r['device_type']) ?: '—' ?></div>
                 </div>
               </div>
 
               <!-- Edit form (hidden until toggled) -->
-              <form method="post" id="devform-<?= e($r['id']) ?>" class="hidden mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <form method="post" id="devform-<?= e($r['id']) ?>" class="hidden">
                 <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
 
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Brand</label>
-                  <input name="brand" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Brand" value="<?= e($r['brand']) ?>">
+                <div class="form-row">
+                  <div>
+                    <label for="brand-<?= e($r['id']) ?>">Brand *</label>
+                    <input id="brand-<?= e($r['id']) ?>" name="brand" value="<?= e($r['brand']) ?>" required>
+                  </div>
+                  <div>
+                    <label for="model-<?= e($r['id']) ?>">Model *</label>
+                    <input id="model-<?= e($r['id']) ?>" name="model" value="<?= e($r['model']) ?>" required>
+                  </div>
+                  <div>
+                    <label for="serial-<?= e($r['id']) ?>">Serial / IMEI *</label>
+                    <input id="serial-<?= e($r['id']) ?>" name="serial_no" value="<?= e($r['serial_no']) ?>" required>
+                  </div>
+                  <div>
+                    <label>Device Type</label>
+                    <input value="<?= e($r['device_type']) ?>" disabled>
+                  </div>
                 </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Model</label>
-                  <input name="model" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Model" value="<?= e($r['model']) ?>">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Serial / IMEI</label>
-                  <input name="serial_no" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Serial/IMEI" value="<?= e($r['serial_no']) ?>">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Device Type</label>
-                  <input class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 bg-gray-50" value="<?= e($r['device_type']) ?>" disabled>
-                </div>
-                <div class="sm:col-span-2 flex gap-2">
-                  <button class="btn btn-primary" name="act" value="update_device">Save Device</button>
-                  <button type="button" class="btn btn-subtle toggle-edit" data-target="#devform-<?= e($r['id']) ?>">Cancel</button>
+                <div class="flex gap-2 mt-4">
+                  <button class="btn primary" name="act" value="update_device">💾 Save Device Details</button>
+                  <button type="button" class="btn subtle toggle-edit" data-target="#devform-<?= e($r['id']) ?>">Cancel</button>
                 </div>
               </form>
-            </div>
+            </div> <!-- End Device Details Card -->
 
-            <!-- Parts Used -->
-            <div class="card p-4">
-              <h3 class="font-semibold text-gray-900">Parts Used</h3>
+            <!-- Parts Used (Now a separate, always visible card) -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="section-title">🧰 Parts Used</h3>
+              </div>
 
-              <div class="mt-3 overflow-x-auto">
-                <table class="min-w-full text-sm">
+              <div class="overflow-x-auto">
+                <table class="parts-table">
                   <thead>
-                    <tr class="text-left text-gray-600">
-                      <th class="py-2 pr-4">Item</th>
-                      <th class="py-2 pr-4">Qty</th>
-                      <th class="py-2 pr-4">Unit</th>
-                      <th class="py-2 pr-4">Remarks</th>
-                      <th class="py-2 text-right">Action</th>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Remarks</th>
+                      <th class="actions-cell">Action</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100">
+                  <tbody>
                     <?php foreach($plist as $p): ?>
                       <tr>
-                        <td class="py-2 pr-4"><?= e($p['item']) ?></td>
-                        <td class="py-2 pr-4"><?= e($p['qty']) ?></td>
-                        <td class="py-2 pr-4 muted"><?= e($p['unit']) ?></td>
-                        <td class="py-2 pr-4 muted"><?= e($p['remarks']) ?></td>
-                        <td class="py-2 text-right">
+                        <td><?= e($p['item']) ?></td>
+                        <td><?= e($p['qty']) ?></td>
+                        <td class="muted"><?= e($p['unit']) ?></td>
+                        <td class="muted"><?= e($p['remarks']) ?></td>
+                        <td class="actions-cell">
                           <form method="post" class="inline">
                             <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
                             <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
                             <input type="hidden" name="pid" value="<?= e($p['id']) ?>">
-                            <button class="btn btn-outline" name="act" value="delpart" onclick="return confirm('Remove this part?')">Remove</button>
+                            <button class="btn outline" name="act" value="delpart" onclick="return confirm('Remove part \'<?= e($p['item']) ?>\'?')">Remove</button>
                           </form>
                         </td>
                       </tr>
                     <?php endforeach; ?>
                     <?php if(!$plist): ?>
-                      <tr><td colspan="5" class="py-3 text-center muted">No parts added yet.</td></tr>
+                      <tr><td colspan="5" class="text-center muted py-2">No parts added yet.</td></tr>
                     <?php endif; ?>
                   </tbody>
                 </table>
               </div>
 
               <!-- Add part -->
-              <form method="post" class="mt-4 grid grid-cols-1 sm:grid-cols-5 gap-3">
+              <form method="post" class="mt-4">
                 <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
 
-                <div class="sm:col-span-2">
-                  <label class="block text-sm font-medium text-gray-700">Item</label>
-                  <input name="item" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="e.g., SSD 512GB">
+                <div class="form-row">
+                  <div>
+                    <label for="item-<?= e($r['id']) ?>">Item *</label>
+                    <input id="item-<?= e($r['id']) ?>" name="item" placeholder="e.g., SSD 512GB" required>
+                  </div>
+                  <div>
+                    <label for="unit-<?= e($r['id']) ?>">Unit</label>
+                    <input id="unit-<?= e($r['id']) ?>" name="unit" placeholder="pcs" value="pcs">
+                  </div>
+                  <div>
+                    <label for="qty-<?= e($r['id']) ?>">Qty *</label>
+                    <input id="qty-<?= e($r['id']) ?>" name="qty" type="number" step="0.01" value="1" min="0.01" required>
+                  </div>
+                  <div>
+                    <label for="remarks-<?= e($r['id']) ?>">Remarks</label>
+                    <input id="remarks-<?= e($r['id']) ?>" name="remarks" placeholder="Optional notes">
+                  </div>
                 </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Unit</label>
-                  <input name="unit" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="pcs" value="pcs">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Qty</label>
-                  <input name="qty" type="number" step="0.01" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" value="1">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Remarks</label>
-                  <input name="remarks" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Optional notes">
-                </div>
-                <div class="sm:col-span-5">
-                  <button class="btn btn-outline" name="act" value="addpart">Add Part</button>
-                </div>
+                <button class="btn outline" name="act" value="addpart">➕ Add Part</button>
               </form>
-            </div>
+            </div> <!-- End Parts Used Card -->
 
-            <!-- Technician Notes -->
-            <div class="card p-4">
-              <h3 class="font-semibold text-gray-900">Technician Notes</h3>
-              <form method="post" class="mt-3">
+            <!-- Technician Notes (Remains outside, always visible) -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="section-title">📝 Technician Notes</h3>
+              </div>
+              <form method="post">
                 <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                <textarea class="w-full min-h-[110px] rounded-lg border border-gray-300 px-3 py-2" name="note_text" placeholder="Diagnostics, work performed, advice..."></textarea>
-                <div class="mt-3">
-                  <button class="btn btn-subtle" name="act" value="add_note">➕ Add Note</button>
+                <div class="form-group">
+                    <label for="note_text-<?= e($r['id']) ?>" class="sr-only">Add Note</label>
+                    <textarea id="note_text-<?= e($r['id']) ?>" class="w-full" name="note_text" placeholder="Diagnostics, work performed, advice..." rows="3" required></textarea>
                 </div>
+                <button class="btn subtle" name="act" value="add_note">➕ Add Note</button>
               </form>
             </div>
           </div>
 
           <!-- Right column -->
-          <div class="space-y-5">
+          <div>
+            <!-- Attachments -->
+            <div class="card mb-4">
+              <h3 class="section-title">📎 Attachments</h3>
+              <?php if (empty($r['attachments'])): ?>
+                  <span class="no-attachments">No files attached.</span>
+              <?php else: ?>
+                  <div class="attachments-grid">
+                      <?php foreach ($r['attachments'] as $attachment): ?>
+                          <?php
+                            $file_path = $attachment['file_path'];
+                            $file_type = strtolower($attachment['file_type']);
+                            $full_url = get_file_url($file_path);
+                            $filename = basename($file_path);
+                            $is_image = is_image_type($file_type);
+                            $is_video = is_video_type($file_type);
+                          ?>
+                          <div class="attachment-item"
+                               onclick="openLightbox('<?= e(addslashes($full_url)) ?>', '<?= e(addslashes($filename)) ?>', '<?= $is_image ? 'image' : ($is_video ? 'video' : 'file') ?>')"
+                               title="Click to view: <?= e($filename) ?>">
+                            <?php if ($is_image): ?>
+                              <img src="<?= e($full_url) ?>" alt="Image: <?= e($filename) ?>" loading="lazy">
+                            <?php elseif ($is_video): ?>
+                              <video muted playsinline>
+                                <source src="<?= e($full_url) ?>" type="video/<?= e($file_type) ?>">
+                                <div class="attachment-placeholder">🎥</div>
+                              </video>
+                            <?php else: ?>
+                              <div class="attachment-placeholder"><?= strtoupper(e($file_type)) ?></div>
+                            <?php endif; ?>
+                            <div class="attachment-filename"><?= e($filename) ?></div>
+                          </div>
+                      <?php endforeach; ?>
+                  </div>
+              <?php endif; ?>
+            </div>
+
             <!-- Timeline -->
-            <div class="card p-4">
-              <h3 class="font-semibold text-gray-900">Status & Notes Timeline</h3>
-              <div class="relative mt-3">
-                <div class="feed-line"></div>
-                <ul class="space-y-4">
-                  <?php if($history): foreach($history as $h): ?>
-                  <li class="relative pl-6">
-                    <span class="feed-dot absolute left-0"></span>
-                    <div class="text-sm">
-                      <div class="flex items-center justify-between">
-                        <div>
-                          <span class="font-medium text-gray-900"><?= e($h['status']) ?></span>
-                          <?php if($h['note']): ?>
-                            <span class="text-gray-700">— <?= e($h['note']) ?></span>
-                          <?php endif; ?>
-                        </div>
-                        <div class="text-xs muted"><?= e($h['created_at'] ?? '') ?></div>
-                      </div>
-                      <div class="text-xs muted mt-0.5"><?= e($h['user_name'] ?: 'System') ?></div>
-                    </div>
-                  </li>
-                  <?php endforeach; else: ?>
-                    <li class="relative pl-6">
-                      <span class="feed-dot absolute left-0"></span>
-                      <div class="text-sm muted">No timeline yet.</div>
-                    </li>
+            <div class="card">
+              <h3 class="section-title">🕒 Status & Notes Timeline</h3>
+              <div class="timeline">
+                <?php if($history): foreach($history as $h): ?>
+                <div class="timeline-item">
+                  <span class="timeline-dot"></span>
+                  <div class="timeline-header">
+                    <div class="timeline-status"><?= e($h['status']) ?></div>
+                    <div class="text-xs muted"><?= e($h['created_at'] ?? '') ?></div>
+                  </div>
+                  <?php if($h['note']): ?>
+                    <div class="timeline-note"><?= nl2br(e($h['note'])) ?></div>
                   <?php endif; ?>
-                </ul>
+                  <div class="timeline-meta">
+                    <span>by <?= e($h['user_name'] ?: 'System') ?></span>
+                  </div>
+                </div>
+                <?php endforeach; else: ?>
+                 <div class="timeline-empty">No timeline entries yet.</div>
+                <?php endif; ?>
               </div>
             </div>
           </div>
         </div>
+        </div> <!-- End Collapsible Content -->
       </article>
       <?php endforeach; ?>
       <?php if(!array_filter($rows, fn($x)=>$x['status']==='In Repair')): ?>
-        <p class="muted">Nothing in repair right now.</p>
+        <p class="muted text-center py-4">No requests are currently In Repair.</p>
       <?php endif; ?>
     </div>
   </section>
 
   <!-- Billed -->
-  <section id="billed" class="tab-content hidden">
-    <input type="text" class="search-input w-full rounded-lg border border-gray-300 px-3 py-2 mb-4" placeholder="🔎 Search..." data-target="list-billed">
-    <div id="list-billed" class="grid gap-4">
-      <?php foreach($rows as $r): if($r['status']!== 'Billed') continue; $invoice = get_invoice($r['id']); ?>
-      <article class="card p-5 searchable">
-        <div class="flex items-start justify-between">
+  <section id="billed" class="tab-content" role="tabpanel" aria-labelledby="tab-billed">
+    <input type="text" class="search-input" placeholder="🔎 Search..." data-target="list-billed" aria-label="Search Billed requests">
+    <div id="list-billed">
+      <?php foreach($rows as $r): if($r['status']!== 'Billed') continue;
+        $invoice = get_invoice($r['id']);
+        // Parse problem list for Billed section too
+        $problemText = $r['problem'] ?? ($r['problem_reported'] ?? ($r['issue_description'] ?? ($r['notes'] ?? '')));
+        $problemList = $problemText ? array_map('trim', explode(';', $problemText)) : [];
+        $problemList = array_filter($problemList, fn($item) => !empty($item));
+        // Get attachments for Billed section
+        // $r['attachments'] is already available from the query loop
+      ?>
+      <article class="card searchable"
+        data-ticket="<?= strtolower(e($r['ticket_code'])) ?>"
+        data-device="<?= strtolower(e($r['device_type'])) ?>"
+        data-brand="<?= strtolower(e($r['brand'] ?? '')) ?>"
+        data-model="<?= strtolower(e($r['model'] ?? '')) ?>"
+        data-customer="<?= strtolower(e($r['cust_name'])) ?>">
+        <div class="card-header">
           <div>
-            <div class="flex items-center gap-2">
-              <h3 class="text-lg font-semibold text-gray-900"><?= e($r['ticket_code']) ?></h3>
-              <span class="chip status-billed">Billed</span>
-              <?php if($invoice): ?><span class="chip bg-gray-100 text-gray-800">Invoice #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span><?php endif; ?>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2><?= e($r['ticket_code']) ?></h2>
+              <span class="chip status-billed"><?= e($r['status']) ?></span>
+              <?php if($invoice): ?>
+                <?php
+                    $quoteStatusClass = 'status-pending';
+                    if ($invoice['quote_status'] === 'Approved') $quoteStatusClass = 'status-approved';
+                    if ($invoice['quote_status'] === 'Rejected') $quoteStatusClass = 'status-rejected';
+                ?>
+                <span class="chip <?= $quoteStatusClass ?>">Invoice #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span>
+              <?php endif; ?>
             </div>
-            <div class="mt-1 text-sm text-gray-600">
-              <?= e($r['device_type']) ?><?= $r['brand']?' · '.e($r['brand']):'' ?><?= $r['model']?' · '.e($r['model']):'' ?>
+            <div class="text-sm muted mt-1">
+              <?= e($r['device_type']) ?><?= $r['brand']?' · <span class="font-medium">'.e($r['brand']).'</span>':'' ?><?= $r['model']?' · <span class="font-medium">'.e($r['model']).'</span>':'' ?>
             </div>
-            <div class="mt-1 text-sm muted">
-              Customer: <span class="font-medium text-gray-800"><?= e($r['cust_name']) ?></span> • <?= e($r['cust_email']) ?><?= $r['cust_phone']?' • '.e($r['cust_phone']):'' ?>
+            <div class="text-sm muted mt-1">
+              Customer: <span class="font-medium"><?= e($r['cust_name']) ?></span> • <?= e($r['cust_email']) ?><?= $r['cust_phone']?' • '.e($r['cust_phone']):'' ?>
             </div>
+             <!-- Problem Reported Summary in Billed Card -->
+            <?php if ($problemText): ?>
+                <div class="text-xs muted mt-1">
+                    <?php if (!empty($problemList) && count($problemList) > 1): ?>
+                         Issues: <?= implode(', ', array_slice(array_map('e', $problemList), 0, 3)) ?><?= count($problemList) > 3 ? '...' : '' ?>
+                    <?php else: ?>
+                         Issue: <?= e(implode(', ', $problemList)) ?>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
           </div>
-          <form method="post" onsubmit="return confirm('Mark as delivered to customer?');">
+          <form method="post" onsubmit="return confirm('Mark this request as delivered to the customer?');">
             <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-            <button class="btn btn-success" name="act" value="mark_delivered">Mark Delivered</button>
+            <button class="btn success" name="act" value="mark_delivered">Mark Delivered</button>
           </form>
         </div>
+
+        <!-- Attachments Summary in Billed Card -->
+        <?php if (!empty($r['attachments'])): ?>
+            <div class="mt-2">
+                <h4 class="text-xs muted mb-1">Attachments:</h4>
+                <div class="attachments-grid">
+                    <?php foreach (array_slice($r['attachments'], 0, 4) as $attachment): // Show max 4 ?>
+                        <?php
+                          $file_path = $attachment['file_path'];
+                          $file_type = strtolower($attachment['file_type']);
+                          $full_url = get_file_url($file_path);
+                          $filename = basename($file_path);
+                          $is_image = is_image_type($file_type);
+                          $is_video = is_video_type($file_type);
+                        ?>
+                        <div class="attachment-item"
+                             onclick="openLightbox('<?= e(addslashes($full_url)) ?>', '<?= e(addslashes($filename)) ?>', '<?= $is_image ? 'image' : ($is_video ? 'video' : 'file') ?>')"
+                             title="Click to view: <?= e($filename) ?>">
+                          <?php if ($is_image): ?>
+                            <img src="<?= e($full_url) ?>" alt="Image: <?= e($filename) ?>" loading="lazy">
+                          <?php elseif ($is_video): ?>
+                            <video muted playsinline>
+                              <source src="<?= e($full_url) ?>" type="video/<?= e($file_type) ?>">
+                              <div class="attachment-placeholder">🎥</div>
+                            </video>
+                          <?php else: ?>
+                            <div class="attachment-placeholder"><?= strtoupper(e($file_type)) ?></div>
+                          <?php endif; ?>
+                          <div class="attachment-filename"><?= e($filename) ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                    <?php if (count($r['attachments']) > 4): ?>
+                        <div class="attachment-item" style="display: flex; align-items: center; justify-content: center; background: var(--field-border); color: var(--muted); font-size: 0.8rem;">
+                            +<?= count($r['attachments']) - 4 ?> more
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
       </article>
       <?php endforeach; ?>
-      <?php if(!array_filter($rows, fn($x)=>$x['status']==='Billed')): ?><p class="muted">No billed items yet.</p><?php endif; ?>
+      <?php if(!array_filter($rows, fn($x)=>$x['status']==='Billed')): ?>
+        <p class="muted text-center py-4">No requests are currently Billed or Ready for Billing.</p>
+      <?php endif; ?>
     </div>
   </section>
 </main>
 
+<!-- Lightbox Modal -->
+<div id="lightbox" class="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <div id="lightbox-content" class="lightbox-content"></div>
+  <div id="lightbox-filename" class="lightbox-filename"></div>
+</div>
+
 <script>
-// Tabs
-const tabBtns = document.querySelectorAll('.tab-btn');
-const tabSections = document.querySelectorAll('.tab-content');
-tabBtns.forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    const id = btn.dataset.tab;
-    tabBtns.forEach(b=>b.dataset.active="false");
-    btn.dataset.active="true";
-    tabSections.forEach(sec=>sec.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-  });
+// --- Lightbox Functionality (from customer/requests.php) ---
+const lightbox = document.getElementById('lightbox');
+const lightboxContent = document.getElementById('lightbox-content');
+const lightboxFilename = document.getElementById('lightbox-filename');
+
+function openLightbox(url, filename, type) {
+  lightboxContent.innerHTML = '';
+  lightboxFilename.textContent = filename;
+
+  if (type === 'image') {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = filename;
+    img.style.borderRadius = '12px';
+    lightboxContent.appendChild(img);
+  } else if (type === 'video') {
+    const video = document.createElement('video');
+    video.src = url;
+    video.controls = true;
+    video.autoplay = true;
+    video.muted = false; // Allow sound for videos opened in lightbox
+    video.style.borderRadius = '12px';
+    lightboxContent.appendChild(video);
+  } else {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = "_blank";
+    link.textContent = `📄 View or download: ${filename}`;
+    link.style.color = 'white';
+    link.style.textDecoration = 'underline';
+    lightboxContent.appendChild(link);
+  }
+
+  lightbox.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  lightbox.classList.remove('active');
+  document.body.style.overflow = '';
+  const video = lightboxContent.querySelector('video');
+  if (video) video.pause();
+}
+
+// Close on click outside
+lightbox.addEventListener('click', (e) => {
+  if (e.target === lightbox) closeLightbox();
 });
 
-// Live search per list
-document.querySelectorAll('.search-input').forEach(input=>{
-  input.addEventListener('input',()=>{
-    const term = input.value.toLowerCase();
-    const list = document.getElementById(input.dataset.target);
-    if(!list) return;
-    list.querySelectorAll('.searchable').forEach(card=>{
-      const txt = card.innerText.toLowerCase();
-      card.style.display = txt.includes(term) ? '' : 'none';
-    });
-  });
+// Close on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+    closeLightbox();
+  }
 });
+// --- End Lightbox Functionality ---
 
-// Toggle edit forms for device
+// --- Toggle Problem List Dropdown (Custom) ---
+function toggleProblemList(triggerElement, requestId) {
+  const dropdown = document.getElementById('problem-list-' + requestId);
+  const icon = document.getElementById('dropdown-icon-' + requestId);
+  if (dropdown && icon) {
+    dropdown.classList.toggle('hidden');
+    // Change the arrow icon
+    icon.textContent = dropdown.classList.contains('hidden') ? '▼' : '▲';
+  }
+}
+// --- End Toggle Problem List Dropdown ---
+
+// --- Toggle Edit Forms (for Device Details) ---
 document.querySelectorAll('.toggle-edit').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const sel = btn.getAttribute('data-target');
@@ -612,6 +1457,74 @@ document.querySelectorAll('.toggle-edit').forEach(btn=>{
     el.classList.toggle('hidden');
   });
 });
+// --- End Toggle Edit Forms ---
+
+// --- Tab Switching ---
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    // Update button states
+    document.querySelectorAll('.tab-btn').forEach(b=> {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+
+    // Show/hide content
+    const id = btn.dataset.tab;
+    document.querySelectorAll('.tab-content').forEach(sec=>sec.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  });
+});
+
+// --- Live Search ---
+function debounce(func, delay) {
+  let timer;
+  return function () {
+    const context = this, args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(() => func.apply(context, args), delay);
+  };
+}
+const applySearch = debounce(() => {
+  document.querySelectorAll('.search-input').forEach(input=>{
+    const term = input.value.toLowerCase().trim();
+    const listId = input.dataset.target;
+    const list = document.getElementById(listId);
+    if(!list) return;
+    list.querySelectorAll('.searchable').forEach(card=>{
+      // Build a string from data attributes for searching
+      const searchableText = [
+        card.dataset.ticket,
+        card.dataset.device,
+        card.dataset.brand,
+        card.dataset.model,
+        card.dataset.customer
+      ].join(' ').toLowerCase();
+      card.style.display = searchableText.includes(term) ? '' : 'none';
+    });
+  });
+}, 150);
+document.querySelectorAll('.search-input').forEach(input => {
+    input.addEventListener('input', applySearch);
+});
+
+
+// --- Collapsible Sections ---
+document.querySelectorAll('.expand-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const targetId = this.getAttribute('data-target');
+        const content = document.querySelector(targetId);
+        const icon = this.querySelector('.expand-icon');
+
+        if (content && icon) {
+            content.classList.toggle('active');
+            icon.classList.toggle('rotated');
+            this.querySelector('span').textContent = content.classList.contains('active') ? 'Collapse Details' : 'Expand Details';
+        }
+    });
+});
+// --- End Collapsible Sections ---
 </script>
 </body>
 </html>

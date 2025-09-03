@@ -3,6 +3,7 @@
  * Customer Requests — NexusFix (Ultimate Edition)
  * World-class UX inspired by Apple, Microsoft, and Best Buy.
  * Enhanced: Attachments are now clickable to view or download.
+ * Feature: Customers can approve or reject pending quotes.
  */
 
 declare(strict_types=1);
@@ -38,6 +39,8 @@ $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
 $highlight = $_GET['new'] ?? null;
+$message = $_GET['note'] ?? null;
+$error_message = $_GET['error'] ?? null;
 
 // Status badge generator
 function status_badge(string $s): string {
@@ -97,6 +100,11 @@ function get_file_url(string $file_path): string {
       --border: #1f2430;
       --field-border: #2a3242;
       --primary: #60a5fa;
+      --accent: #6ee7b7;
+      --danger: #f87171;
+      --success: #34d399;
+      --warning: #fbbf24;
+      --info: #93c5fd;
       --shadow: 0 10px 30px rgba(0,0,0,.35);
       --shadow-sm: 0 4px 12px rgba(0,0,0,.18);
       --radius: 16px;
@@ -140,6 +148,24 @@ function get_file_url(string $file_path): string {
       color: var(--muted);
       font-size: 0.95rem;
       margin-top: 0.25rem;
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .alert.success {
+      background: rgba(52, 211, 153, 0.15);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      color: var(--success);
+    }
+    .alert.error {
+      background: rgba(248, 113, 113, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: var(--danger);
     }
 
     /* Filters */
@@ -237,11 +263,15 @@ function get_file_url(string $file_path): string {
       color: var(--muted);
     }
 
-    /* Invoice */
+    /* Invoice Actions */
     .invoice-actions {
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid var(--field-border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
     }
 
     .btn {
@@ -253,11 +283,36 @@ function get_file_url(string $file_path): string {
       font-weight: 600;
       cursor: pointer;
       transition: var(--transition);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .btn:hover {
       background: #4f9cf9;
       transform: translateY(-1px);
+    }
+
+    .btn.success {
+        background: var(--success);
+    }
+    .btn.success:hover {
+        background: #2cbe8a;
+    }
+    .btn.danger {
+        background: var(--danger);
+    }
+    .btn.danger:hover {
+        background: #e53e3e;
+    }
+    .btn.outline {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--field-border);
+    }
+    .btn.outline:hover {
+        background: rgba(255,255,255,.06);
     }
 
     .trust {
@@ -439,6 +494,16 @@ function get_file_url(string $file_path): string {
       </div>
     </div>
 
+    <?php if ($message): ?>
+      <div class="alert success" role="alert">
+        <strong>Info:</strong> <?= e($message) ?>
+      </div>
+    <?php endif; ?>
+    <?php if ($error_message): ?>
+      <div class="alert error" role="alert">
+        <strong>Error:</strong> <?= e($error_message) ?>
+      </div>
+    <?php endif; ?>
     <?php if ($highlight): ?>
       <div class="request-item" style="border-left:4px solid var(--primary);">
         <strong>Success:</strong> Your ticket <strong><?= e($highlight) ?></strong> was created and is <em>Received</em>.
@@ -574,20 +639,42 @@ function get_file_url(string $file_path): string {
             </details>
 
             <!-- Invoice Actions -->
-            <?php if ($invoice && $invoice['payment_status'] === 'Unpaid'): ?>
+            <?php if ($invoice): ?>
               <div class="invoice-actions">
-                <form action="<?= e(base_url('customer/pay_invoice.php')) ?>" method="post" style="display:inline;">
-                  <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                  <input type="hidden" name="invoice_id" value="<?= (int)$invoice['id'] ?>">
-                  <button class="btn">Pay Invoice #<?= (int)$invoice['id'] ?></button>
-                </form>
-              </div>
-            <?php elseif ($invoice && $invoice['payment_status'] === 'Paid'): ?>
-              <div class="invoice-actions">
-                <p class="trust">
-                  ✅ Invoice #<?= (int)$invoice['id'] ?> paid on
-                  <?= (new DateTime($invoice['payment_date']))->format('M j, Y') ?>
-                </p>
+                <?php if ($invoice['quote_status'] === 'Pending'): ?>
+                  <!-- Pending Quote Actions -->
+                  <p class="trust">
+                    📝 Quote #<?= (int)$invoice['id'] ?> is ready for review.
+                  </p>
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                    <form method="post" action="<?= e(base_url('customer/handle_quote_action.php')) ?>" style="display:inline;" onsubmit="return confirm('Approve this quote? This will send it for processing.');">
+                      <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                      <input type="hidden" name="invoice_id" value="<?= (int)$invoice['id'] ?>">
+                      <input type="hidden" name="action" value="approve">
+                      <button type="submit" class="btn success">👍 Approve Quote</button>
+                    </form>
+                    <form method="post" action="<?= e(base_url('customer/handle_quote_action.php')) ?>" style="display:inline;" onsubmit="handleRejectSubmit(event, this);">
+                      <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                      <input type="hidden" name="invoice_id" value="<?= (int)$invoice['id'] ?>">
+                      <input type="hidden" name="action" value="reject">
+                      <input type="hidden" name="reject_reason" id="reject-reason-<?= (int)$invoice['id'] ?>" value="">
+                      <button type="submit" class="btn danger">👎 Reject Quote</button>
+                    </form>
+                  </div>
+                <?php elseif ($invoice['payment_status'] === 'Unpaid'): ?>
+                  <!-- Unpaid Invoice Actions -->
+                  <form action="<?= e(base_url('customer/pay_invoice.php')) ?>" method="post" style="display:inline;">
+                    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="invoice_id" value="<?= (int)$invoice['id'] ?>">
+                    <button class="btn">💳 Pay Invoice #<?= (int)$invoice['id'] ?></button>
+                  </form>
+                <?php elseif ($invoice['payment_status'] === 'Paid'): ?>
+                  <!-- Paid Invoice Message -->
+                  <p class="trust">
+                    ✅ Invoice #<?= (int)$invoice['id'] ?> paid on
+                    <?= (new DateTime($invoice['payment_date']))->format('M j, Y') ?>
+                  </p>
+                <?php endif; ?>
               </div>
             <?php endif; ?>
           </article>
@@ -623,7 +710,7 @@ function get_file_url(string $file_path): string {
         video.src = url;
         video.controls = true;
         video.autoplay = true;
-        video.muted = false;
+        video.muted = false; // Allow sound for videos opened in lightbox
         video.style.borderRadius = '12px';
         lightboxContent.appendChild(video);
       } else {
@@ -658,6 +745,25 @@ function get_file_url(string $file_path): string {
         closeLightbox();
       }
     });
+
+    // --- Quote Rejection Prompt ---
+    function handleRejectSubmit(event, formElement) {
+        event.preventDefault(); // Stop the default form submission
+        const invoiceIdInput = formElement.querySelector('input[name="invoice_id"]');
+        const invoiceId = invoiceIdInput ? invoiceIdInput.value : 'unknown';
+        const reason = prompt("Please provide a brief reason for rejecting quote #" + invoiceId + ":");
+        if (reason !== null) { // User clicked OK (they can enter an empty reason)
+            // Set the reason in the hidden input
+            const reasonInput = document.getElementById('reject-reason-' + invoiceId);
+            if (reasonInput) {
+                reasonInput.value = reason.trim(); // Trim whitespace
+            }
+            // Submit the form programmatically
+            formElement.submit();
+        }
+        // If reason is null (user clicked Cancel), do nothing, form doesn't submit.
+    }
+    // --- End Quote Rejection Prompt ---
 
     // Search & Filter
     const searchInput = document.getElementById('request-search');
