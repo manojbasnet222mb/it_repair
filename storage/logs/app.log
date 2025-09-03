@@ -1,78 +1,11 @@
-2025-08-21T09:52:49+02:00 [error] Undefined array key "problem_description" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\repair.php","line":128}
-2025-08-22T11:19:30+02:00 [error] Undefined array key "problem_desc" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\repair.php","line":246}
-2025-08-22T13:43:40+02:00 [error] Call to undefined function get_pending_quotes_count() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\dashboard.php","line":8}
-2025-08-22T13:43:41+02:00 [error] Call to undefined function get_pending_quotes_count() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\dashboard.php","line":8}
-2025-08-22T13:43:43+02:00 [error] Call to undefined function get_pending_quotes_count() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\dashboard.php","line":8}
-2025-08-22T14:03:41+02:00 [error] Call to undefined function csrf_make() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\request_new.php","line":142}
-2025-08-22T14:03:46+02:00 [error] Call to undefined function csrf_make() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\request_new.php","line":142}
-2025-08-22T14:04:11+02:00 [error] Call to undefined function csrf_make() {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\request_new.php","line":120}
-2025-08-22T18:07:50+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\faq.php","line":367}
-2025-08-22T18:12:07+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\faq.php","line":367}
-2025-08-22T18:15:44+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-2025-08-22T18:15:47+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-2025-08-22T18:15:57+02:00 [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-22T18:17:03+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-22T18:17:03+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-22T18:17:04+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-22T18:17:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-22T18:17:07+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-22T18:17:57+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-22T18:18:02+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:02+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:05+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:06+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:07+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:08+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:10:09+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:14:40+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:44+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:49+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:49+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:49+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:50+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-23T04:19:51+02:00] [error] Undefined array key "updated_at" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\support\\kb.php","line":367}
-[2025-08-25T04:11:08+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
-[2025-08-25T04:15:27+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
-[2025-08-25T04:21:05+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
-[2025-08-25T04:22:43+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":77}
-[2025-08-25T04:31:05+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":105}
-[2025-08-25T04:31:20+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":105}
-[2025-08-25T04:44:22+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T04:44:42+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T04:56:19+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T04:56:22+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T04:57:30+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T05:36:36+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T05:38:41+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T05:40:47+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T05:41:51+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T05:48:18+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-25T05:56:38+02:00] [error] Undefined array key "profile_picture" {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\profile.php","line":93}
-[2025-08-31T08:04:59+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:06:39+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:06:41+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:06:41+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:06:41+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:07:47+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:07:48+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:07:48+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:07:48+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:07:48+02:00] [error] Too few arguments to function get_file_url(), 1 passed in C:\xampp\htdocs\it_repair\public\customer\requests.php on line 466 and exactly 2 expected {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":74}
-[2025-08-31T08:51:21+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'original_filename' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":59}
-[2025-08-31T08:51:23+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'original_filename' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":59}
-[2025-08-31T08:51:32+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'original_filename' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":59}
-[2025-08-31T08:51:35+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'original_filename' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\requests.php","line":59}
+[2025-09-03T09:03:28+02:00] [debug] Old profile picture deleted: C:\xampp\htdocs\it_repairuploads/profile_pictures/profile_68b7e631bbf025.84926865.jpg
+[2025-09-03T09:08:16+02:00] [debug] Attempting to save image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7e960acac33.77928020.png
+[2025-09-03T09:08:17+02:00] [debug] Successfully saved image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7e960acac33.77928020.png
+[2025-09-03T09:09:09+02:00] [debug] Attempting to save image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7e995f39490.13013295.png
+[2025-09-03T09:09:10+02:00] [debug] Successfully saved image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7e995f39490.13013295.png
+[2025-09-03T09:16:48+02:00] [debug] Attempting to save image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7eb60e03fe3.47378119.png
+[2025-09-03T09:16:49+02:00] [debug] Successfully saved image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7eb60e03fe3.47378119.png
+[2025-09-03T09:18:42+02:00] [debug] Attempting to delete old picture at: C:\xampp\htdocs\it_repair/uploads/profile_pictures/profile_68b7eb60e03fe3.47378119.png
+[2025-09-03T09:18:42+02:00] [debug] Old profile picture file not found for deletion: C:\xampp\htdocs\it_repair/uploads/profile_pictures/profile_68b7eb60e03fe3.47378119.png
+[2025-09-03T09:18:49+02:00] [debug] Attempting to save image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7ebd98eac70.15449189.png
+[2025-09-03T09:18:50+02:00] [debug] Successfully saved image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b7ebd98eac70.15449189.png

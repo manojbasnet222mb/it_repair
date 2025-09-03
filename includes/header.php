@@ -23,6 +23,10 @@ if (!empty($_SESSION['user']) && $_SESSION['user']['role'] === 'customer') {
 // Set a default theme in PHP just in case JS fails or is slow
 $initial_theme = 'dark'; // Default fallback
 // Check localStorage via JS on page load (more reliable than PHP cookies/session for client-side toggle)
+
+// --- Define base path for checking file existence ---
+// This ensures we correctly build paths for file system operations in the header
+define('HEADER_BASE_UPLOAD_PATH', rtrim(realpath($_SERVER['DOCUMENT_ROOT']), DIRECTORY_SEPARATOR));
 ?>
 <!DOCTYPE html>
 <!-- The data-theme will be set by JavaScript below, this is just a fallback -->
@@ -403,10 +407,15 @@ $initial_theme = 'dark'; // Default fallback
     <?php if (!empty($_SESSION['user'])): ?>
       <div class="dropdown" id="userDropdown">
         <div class="user-menu-trigger">
-            <?php if (!empty($_SESSION['user']['profile_picture']) && file_exists(__DIR__ . '/../public/' . $_SESSION['user']['profile_picture'])): ?>
+            <?php
+            // Check if profile picture exists using the correct path
+            $hasProfilePictureHeader = !empty($_SESSION['user']['profile_picture']) &&
+                                       file_exists(HEADER_BASE_UPLOAD_PATH . DIRECTORY_SEPARATOR . $_SESSION['user']['profile_picture']);
+            if ($hasProfilePictureHeader):
+            ?>
                 <!-- Display profile picture -->
                 <div class="user-avatar-header">
-                    <img src="<?= e(base_url($_SESSION['user']['profile_picture'])) ?>" alt="Profile Picture">
+                    <img src="<?= e('/' . $_SESSION['user']['profile_picture']) ?>" alt="Profile Picture">
                 </div>
             <?php else: ?>
                 <!-- Display initials avatar -->
@@ -425,10 +434,10 @@ $initial_theme = 'dark'; // Default fallback
         </div>
         <div class="dropdown-content">
           <div style="padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px;">
-            <?php if (!empty($_SESSION['user']['profile_picture']) && file_exists(__DIR__ . '/../public/' . $_SESSION['user']['profile_picture'])): ?>
+            <?php if ($hasProfilePictureHeader): ?>
                 <!-- Display profile picture in dropdown header -->
                 <div class="user-avatar-header">
-                    <img src="<?= e(base_url($_SESSION['user']['profile_picture'])) ?>" alt="Profile Picture">
+                    <img src="<?= e('/' . $_SESSION['user']['profile_picture']) ?>" alt="Profile Picture">
                 </div>
             <?php else: ?>
                 <!-- Display initials avatar in dropdown header -->
