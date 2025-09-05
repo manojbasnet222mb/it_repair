@@ -12,3 +12,15 @@
 [2025-09-03T12:50:36+02:00] [debug] Attempting to save image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b81d7c4554e3.79829093.png
 [2025-09-03T12:50:36+02:00] [debug] Successfully saved image to: C:\xampp\htdocs\it_repair\uploads\profile_pictures\profile_68b81d7c4554e3.79829093.png
 [2025-09-03T16:22:04+02:00] [error] require_once(C:\xampp\htdocs\it_repair\public\customer/../../vendor/autoload.php): Failed to open stream: No such file or directory {"file":"C:\\xampp\\htdocs\\it_repair\\public\\customer\\pay_invoice.php","line":18}
+[2025-09-03T18:08:07+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.total_amount' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":251}
+[2025-09-03T18:08:18+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.total_amount' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":251}
+[2025-09-03T18:11:09+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.approved_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":263}
+[2025-09-03T18:11:29+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.approved_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":263}
+[2025-09-03T18:14:49+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.billed_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":273}
+[2025-09-03T18:20:34+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.billed_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":272}
+[2025-09-04T03:47:18+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.billed_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":272}
+[2025-09-04T17:29:23+02:00] [error] include(C:\xampp\htdocs\it_repair\public\staff/nav.php): Failed to open stream: No such file or directory {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":296}
+[2025-09-05T07:47:56+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.approved_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":188}
+[2025-09-05T07:51:13+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.approved_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":188}
+[2025-09-05T08:02:37+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.billed_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":168}
+[2025-09-05T08:03:12+02:00] [error] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.billed_at' in 'field list' {"file":"C:\\xampp\\htdocs\\it_repair\\public\\staff\\billing.php","line":168}

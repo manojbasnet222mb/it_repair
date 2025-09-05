@@ -5,6 +5,10 @@
  * Features: Tabbed views, responsive cards, inline editing, parts listing, quote management, timeline.
  * Enhanced with: Consistent dark/light mode, improved visual hierarchy, streamlined actions,
  *                Attachment previews, Expandable problem list, Collapsible sections.
+ * Modified for 3-tab workflow:
+ * - Tab 1: Needs Quote (In Repair, No/Pending/Rejected Quote)
+ * - Tab 2: Quote Pending Approval (Managed by Billing Desk)
+ * - Tab 3: Approved & Repairing (Customer Approved Quote)
  */
 declare(strict_types=1);
 require_once __DIR__.'/../../includes/bootstrap.php';
@@ -153,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
 
-      // Generate Quote
+      // --- PHASE 1, STEP 1: Generate Quote Action ---
       if (!$errors && $act === 'generate_quote') {
         if(!$isInRepair){
           $errors['status'] = 'Quotes can only be generated while the request is In Repair.';
@@ -166,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $s->execute([$invoice['id']]);
             add_history($rid,'In Repair','Quote generated (Pending approval)',$userId);
             $pdo->commit();
-            $note = 'Quote generated and is now pending approval.';
+            $note = 'Quote generated and is now pending approval by Billing Desk.';
           } catch(Exception $e){
             $pdo->rollBack();
             $errors['quote'] = 'Failed to generate the quote. Please try again.';
@@ -175,42 +179,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
 
-      // Approve Quote
-      if (!$errors && $act === 'approve_quote') {
-        $iid = (int)($_POST['invoice_id'] ?? 0);
-        if(!$iid){
-          $errors['invoice'] = 'Missing invoice ID.';
-        } else {
-          $inv = db()->prepare("SELECT * FROM invoices WHERE id=? AND request_id=?");
-          $inv->execute([$iid,$rid]);
-          $invoice = $inv->fetch();
-          if(!$invoice){
-            $errors['invoice'] = 'Invoice not found.';
-          } elseif($invoice['quote_status'] !== 'Pending'){
-            $errors['invoice'] = 'Only pending quotes can be approved.';
-          } else {
-            db()->prepare("UPDATE invoices SET quote_status='Approved' WHERE id=?")->execute([$iid]);
-            add_history($rid,'In Repair','Quote approved',$userId);
-            $note = 'Quote approved successfully.';
-          }
-        }
-      }
 
-      // Reject Quote
-      if (!$errors && $act === 'reject_quote') {
-        $iid = (int)($_POST['invoice_id'] ?? 0);
-        $reason = trim($_POST['reject_reason'] ?? '');
-        if(!$iid){
-             $errors['invoice'] = 'Missing invoice ID for rejection.';
-        } else {
-            db()->prepare("UPDATE invoices SET quote_status='Rejected' WHERE id=?")->execute([$iid]);
-            $noteText = 'Quote rejected' . ($reason ? ': ' . $reason : '');
-            add_history($rid,'In Repair', $noteText ,$userId);
-            $note = 'Quote rejected.';
-        }
-      }
-
-      // Send to Billing
+      // Send to Billing (Assuming this happens after quote is approved and repair is done)
+      // This action might need refinement based on your exact workflow
       if (!$errors && $act === 'complete') {
         $invoice = get_invoice($rid);
         if ($invoice && $invoice['quote_status'] === 'Approved' && $isInRepair) {
@@ -255,19 +226,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // --- Queries for view (with attachments) -------------------------------------------------------
-// Fetch requests and add attachments to each
-$raw_rows = db()->query("SELECT rr.*, u.name cust_name, u.email cust_email, u.phone cust_phone
+// Fetch requests grouped by our new workflow states
+$needsQuoteRows = db()->query("
+  SELECT rr.*, u.name cust_name, u.email cust_email, u.phone cust_phone,
+         i.id as invoice_id, i.quote_status
   FROM repair_requests rr
   JOIN users u ON u.id=rr.customer_id
-  WHERE rr.status IN ('In Repair','Billed')
-  ORDER BY rr.id DESC")->fetchAll();
+  LEFT JOIN invoices i ON i.request_id = rr.id
+  WHERE rr.status = 'In Repair'
+    AND (i.quote_status IS NULL OR i.quote_status IN ('Rejected'))
+  ORDER BY rr.id DESC
+")->fetchAll();
 
-$rows = [];
-foreach ($raw_rows as $row) {
-    $row['attachments'] = get_request_attachments((int)$row['id']);
-    $rows[] = $row;
+// --- Tab 2: Quote Pending Approval ---
+// This tab now shows requests where the invoice exists and is 'Pending'.
+// The billing desk manages the approval/rejection process.
+// The repair desk sees status updates from the billing desk.
+$pendingApprovalRows = db()->query("
+  SELECT rr.*, u.name cust_name, u.email cust_email, u.phone cust_phone,
+         i.id as invoice_id, i.quote_status
+  FROM repair_requests rr
+  JOIN users u ON u.id=rr.customer_id
+  JOIN invoices i ON i.request_id = rr.id
+  WHERE i.quote_status = 'Pending' AND rr.status = 'In Repair'
+  ORDER BY rr.id DESC
+")->fetchAll();
+
+// --- Tab 3: Approved & Repairing ---
+// This tab shows requests where the customer has approved the quote.
+// The repair desk does the work and then sends it to billing.
+$approvedRepairingRows = db()->query("
+  SELECT rr.*, u.name cust_name, u.email cust_email, u.phone cust_phone,
+         i.id as invoice_id, i.quote_status
+  FROM repair_requests rr
+  JOIN users u ON u.id=rr.customer_id
+  JOIN invoices i ON i.request_id = rr.id
+  WHERE i.quote_status = 'Approved' AND rr.status = 'In Repair'
+  ORDER BY rr.id DESC
+")->fetchAll();
+
+// Combine all rows for searching/filtering if needed later, or keep separate
+// For now, we'll process them separately for each tab.
+// Add attachments to each row
+function add_attachments(&$rows) {
+    foreach ($rows as &$row) {
+        $row['attachments'] = get_request_attachments((int)$row['id']);
+    }
+    unset($row); // Unset reference variable
 }
-unset($raw_rows); // Free memory
+add_attachments($needsQuoteRows);
+add_attachments($pendingApprovalRows);
+add_attachments($approvedRepairingRows);
 
 ?>
 <!doctype html>
@@ -835,41 +844,6 @@ label {
   font-size: 0.9rem;
 }
 
-/* --- Collapsible Sections --- */
-.expand-btn {
-  background: none;
-  border: none;
-  color: var(--primary);
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-.expand-btn:hover {
-  background: rgba(96, 165, 250, 0.1);
-}
-.expand-icon {
-  transition: transform 0.3s ease;
-}
-.expand-icon.rotated {
-  transform: rotate(180deg);
-}
-.collapsible-content {
-  display: none;
-  padding-top: 1rem;
-  border-top: 1px solid var(--field-border);
-  margin-top: 1rem;
-}
-.collapsible-content.active {
-  display: block;
-}
-/* --- End Collapsible Sections --- */
-
-
 /* --- Utils --- */
 .muted { color: var(--muted); }
 .text-sm { font-size: 0.9rem; }
@@ -929,16 +903,18 @@ label {
 
   <!-- Tabs -->
   <div class="tabs" role="tablist">
-    <button class="tab-btn active" data-tab="inrepair" role="tab" aria-selected="true">🔧 In Repair</button>
-    <button class="tab-btn" data-tab="billed" role="tab" aria-selected="false">💸 Ready for Billing / Billed</button>
+    <button class="tab-btn active" data-tab="needs-quote" role="tab" aria-selected="true">📋 Needs Quote</button>
+    <button class="tab-btn" data-tab="pending-approval" role="tab" aria-selected="false">⏳ Quote Pending Approval</button>
+    <button class="tab-btn" data-tab="approved-repairing" role="tab" aria-selected="false">🛠️ Approved & Repairing</button>
   </div>
 
-  <!-- In Repair -->
-  <section id="inrepair" class="tab-content active" role="tabpanel" aria-labelledby="tab-inrepair">
-    <input type="text" class="search-input" placeholder="🔎 Search (ticket, device, customer, parts, notes)" data-target="list-inrepair" aria-label="Search In Repair requests">
-    <div id="list-inrepair">
-      <?php foreach($rows as $r): if($r['status']!== 'In Repair') continue;
+  <!-- Needs Quote -->
+  <section id="needs-quote" class="tab-content active" role="tabpanel" aria-labelledby="tab-needs-quote">
+    <input type="text" class="search-input" placeholder="🔎 Search (ticket, device, customer, parts, notes)" data-target="list-needs-quote" aria-label="Search Needs Quote requests">
+    <div id="list-needs-quote">
+      <?php foreach($needsQuoteRows as $r):
         $plist   = parts_for($r['id']);
+        // $invoice might be null or have quote_status 'Rejected'
         $invoice = get_invoice($r['id']);
         $history = history_for($r['id']);
         // Fallback chain for problem description
@@ -954,7 +930,7 @@ label {
         data-brand="<?= strtolower(e($r['brand'] ?? '')) ?>"
         data-model="<?= strtolower(e($r['model'] ?? '')) ?>"
         data-customer="<?= strtolower(e($r['cust_name'])) ?>">
-        <!-- Header (Always Visible) -->
+        <!-- Header -->
         <div class="card-header">
           <div>
             <div class="flex items-center gap-2 flex-wrap">
@@ -962,9 +938,9 @@ label {
               <span class="chip status-inrepair"><?= e($r['status']) ?></span>
               <?php if($invoice): ?>
                 <?php
-                    $quoteStatusClass = 'status-pending';
-                    if ($invoice['quote_status'] === 'Approved') $quoteStatusClass = 'status-approved';
+                    $quoteStatusClass = 'status-rejected'; // Default for this tab
                     if ($invoice['quote_status'] === 'Rejected') $quoteStatusClass = 'status-rejected';
+                    // This condition should ideally not happen here due to query, but good safeguard
                 ?>
                 <span class="chip <?= $quoteStatusClass ?>">Quote #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span>
               <?php endif; ?>
@@ -976,53 +952,20 @@ label {
               Customer: <span class="font-medium"><?= e($r['cust_name']) ?></span> • <?= e($r['cust_email']) ?><?= $r['cust_phone']?' • '.e($r['cust_phone']):'' ?>
             </div>
           </div>
-          <button class="expand-btn" type="button" data-target="#collapsible-<?= e($r['id']) ?>">
-              <span>Expand Details</span>
-              <span class="expand-icon">▼</span>
-          </button>
+
+          <!-- Action Toolbar (Generate Quote is primary here) -->
+          <div class="flex flex-wrap gap-2">
+            <form method="post">
+              <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+              <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
+              <button class="btn primary" name="act" value="generate_quote" <?= empty($plist) ? 'disabled title="Add parts first"' : '' ?>>Generate Quote</button>
+            </form>
+          </div>
         </div>
 
-        <!-- Collapsible Content -->
-        <div id="collapsible-<?= e($r['id']) ?>" class="collapsible-content">
         <div class="grid-2">
           <!-- Left column -->
           <div>
-
-            <!-- Action Toolbar -->
-            <div class="card mb-4">
-              <h3 class="section-title">Actions</h3>
-              <div class="flex flex-wrap gap-2">
-                <form method="post">
-                  <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                  <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                  <button class="btn primary" name="act" value="generate_quote">Generate Quote</button>
-                </form>
-
-                <?php if($invoice && $invoice['quote_status'] === 'Pending'): ?>
-                  <form method="post">
-                    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                    <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                    <input type="hidden" name="invoice_id" value="<?= e($invoice['id']) ?>">
-                    <button class="btn success" name="act" value="approve_quote">Approve Quote</button>
-                  </form>
-                  <form method="post" class="form-inline">
-                    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                    <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                    <input type="hidden" name="invoice_id" value="<?= e($invoice['id']) ?>">
-                    <input name="reject_reason" placeholder="Reason (optional)" aria-label="Reject reason">
-                    <button class="btn outline" name="act" value="reject_quote" onclick="return confirm('Are you sure you want to reject this quote?');">Reject</button>
-                  </form>
-                <?php endif; ?>
-
-                <?php if($invoice && $invoice['quote_status'] === 'Approved'): ?>
-                  <form method="post" onsubmit="return confirm('Send this request to Billing?');">
-                    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                    <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-                    <button class="btn primary" name="act" value="complete">Send to Billing</button>
-                  </form>
-                <?php endif; ?>
-              </div>
-            </div>
 
             <!-- Problem Reported -->
             <div class="highlight-box">
@@ -1104,13 +1047,13 @@ label {
                   </div>
                 </div>
                 <div class="flex gap-2 mt-4">
-                  <button class="btn primary" name="act" value="update_device">💾 Save Device Details</button>
+                  <button class="btn primary" name="act" value="update_device">💾 Save</button>
                   <button type="button" class="btn subtle toggle-edit" data-target="#devform-<?= e($r['id']) ?>">Cancel</button>
                 </div>
               </form>
-            </div> <!-- End Device Details Card -->
+            </div>
 
-            <!-- Parts Used (Now a separate, always visible card) -->
+            <!-- Parts Used -->
             <div class="card">
               <div class="card-header">
                 <h3 class="section-title">🧰 Parts Used</h3>
@@ -1176,9 +1119,9 @@ label {
                 </div>
                 <button class="btn outline" name="act" value="addpart">➕ Add Part</button>
               </form>
-            </div> <!-- End Parts Used Card -->
+            </div>
 
-            <!-- Technician Notes (Remains outside, always visible) -->
+            <!-- Technician Notes -->
             <div class="card">
               <div class="card-header">
                 <h3 class="section-title">📝 Technician Notes</h3>
@@ -1258,27 +1201,27 @@ label {
             </div>
           </div>
         </div>
-        </div> <!-- End Collapsible Content -->
       </article>
       <?php endforeach; ?>
-      <?php if(!array_filter($rows, fn($x)=>$x['status']==='In Repair')): ?>
-        <p class="muted text-center py-4">No requests are currently In Repair.</p>
+      <?php if(empty($needsQuoteRows)): ?>
+        <p class="muted text-center py-4">No requests need a quote at this time.</p>
       <?php endif; ?>
     </div>
   </section>
 
-  <!-- Billed -->
-  <section id="billed" class="tab-content" role="tabpanel" aria-labelledby="tab-billed">
-    <input type="text" class="search-input" placeholder="🔎 Search..." data-target="list-billed" aria-label="Search Billed requests">
-    <div id="list-billed">
-      <?php foreach($rows as $r): if($r['status']!== 'Billed') continue;
-        $invoice = get_invoice($r['id']);
-        // Parse problem list for Billed section too
+  <!-- Quote Pending Approval -->
+  <section id="pending-approval" class="tab-content" role="tabpanel" aria-labelledby="tab-pending-approval">
+    <input type="text" class="search-input" placeholder="🔎 Search..." data-target="list-pending-approval" aria-label="Search Pending Approval requests">
+    <div id="list-pending-approval">
+      <?php foreach($pendingApprovalRows as $r):
+        $plist   = parts_for($r['id']);
+        $invoice = get_invoice($r['id']); // Guaranteed to exist and be 'Pending' by query
+        $history = history_for($r['id']);
+        // Fallback chain for problem description
         $problemText = $r['problem'] ?? ($r['problem_reported'] ?? ($r['issue_description'] ?? ($r['notes'] ?? '')));
+        // Parse problem list (assuming '; ' separator)
         $problemList = $problemText ? array_map('trim', explode(';', $problemText)) : [];
         $problemList = array_filter($problemList, fn($item) => !empty($item));
-        // Get attachments for Billed section
-        // $r['attachments'] is already available from the query loop
       ?>
       <article class="card searchable"
         data-ticket="<?= strtolower(e($r['ticket_code'])) ?>"
@@ -1290,14 +1233,9 @@ label {
           <div>
             <div class="flex items-center gap-2 flex-wrap">
               <h2><?= e($r['ticket_code']) ?></h2>
-              <span class="chip status-billed"><?= e($r['status']) ?></span>
+              <span class="chip status-inrepair"><?= e($r['status']) ?></span>
               <?php if($invoice): ?>
-                <?php
-                    $quoteStatusClass = 'status-pending';
-                    if ($invoice['quote_status'] === 'Approved') $quoteStatusClass = 'status-approved';
-                    if ($invoice['quote_status'] === 'Rejected') $quoteStatusClass = 'status-rejected';
-                ?>
-                <span class="chip <?= $quoteStatusClass ?>">Invoice #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span>
+                <span class="chip status-pending">Quote #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span>
               <?php endif; ?>
             </div>
             <div class="text-sm muted mt-1">
@@ -1306,66 +1244,337 @@ label {
             <div class="text-sm muted mt-1">
               Customer: <span class="font-medium"><?= e($r['cust_name']) ?></span> • <?= e($r['cust_email']) ?><?= $r['cust_phone']?' • '.e($r['cust_phone']):'' ?>
             </div>
-             <!-- Problem Reported Summary in Billed Card -->
-            <?php if ($problemText): ?>
-                <div class="text-xs muted mt-1">
-                    <?php if (!empty($problemList) && count($problemList) > 1): ?>
-                         Issues: <?= implode(', ', array_slice(array_map('e', $problemList), 0, 3)) ?><?= count($problemList) > 3 ? '...' : '' ?>
-                    <?php else: ?>
-                         Issue: <?= e(implode(', ', $problemList)) ?>
+          </div>
+          <!-- No direct approve/reject buttons here -->
+          <div class="text-sm muted">
+              <!-- Placeholder for status updates from Billing Desk -->
+              <!-- You would populate this with actual data from the invoice or history -->
+              <!-- Example logic: Find the last relevant history entry or check invoice fields -->
+              <?php
+                $sentToCustomerDate = null;
+                $requoteRequestedDate = null;
+                // Simplified example: Check history for specific notes
+                foreach($history as $h) {
+                    if (strpos($h['note'], 'Quote generated') !== false) {
+                        $sentToCustomerDate = $h['created_at'];
+                        break; // Assume first generation is the one sent
+                    }
+                }
+                // Another example: Check if invoice has a specific field or status indicating re-quote
+                // For now, we'll just simulate it
+                // $requoteRequestedDate = $invoice['requote_requested_at'] ?? null;
+              ?>
+              <?php if ($sentToCustomerDate): ?>
+                  <div>Sent to Customer: <?= e(date('M j, Y g:i A', strtotime($sentToCustomerDate))) ?></div>
+              <?php endif; ?>
+              <?php if ($requoteRequestedDate): ?>
+                  <div>Re-quote Requested: <?= e(date('M j, Y g:i A', strtotime($requoteRequestedDate))) ?></div>
+              <?php endif; ?>
+              <?php if (!$sentToCustomerDate && !$requoteRequestedDate): ?>
+                  <div>Awaiting status update from Billing Desk...</div>
+              <?php endif; ?>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <!-- Problem Reported Summary -->
+            <div class="highlight-box">
+              <h3 class="section-title">⚠️ Problem Reported</h3>
+              <?php if ($problemText): ?>
+                <?php if (!empty($problemList) && count($problemList) > 1): ?>
+                     <div class="text-sm"><?= implode(', ', array_slice(array_map('e', $problemList), 0, 3)) ?><?= count($problemList) > 3 ? '...' : '' ?></div>
+                <?php else: ?>
+                     <div class="text-sm"><?= e(implode(', ', $problemList)) ?></div>
+                <?php endif; ?>
+              <?php else: ?>
+                <div class="text-sm muted">No problem description provided.</div>
+              <?php endif; ?>
+            </div>
+
+            <!-- Parts List Summary -->
+            <div class="card">
+              <h3 class="section-title">🧰 Parts for Quote</h3>
+              <div class="overflow-x-auto">
+                <table class="parts-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach($plist as $p): ?>
+                      <tr>
+                        <td><?= e($p['item']) ?></td>
+                        <td><?= e($p['qty']) ?></td>
+                        <td class="muted"><?= e($p['unit']) ?></td>
+                        <td class="muted"><?= e($p['remarks']) ?></td>
+                      </tr>
+                    <?php endforeach; ?>
+                    <?php if(!$plist): ?>
+                      <tr><td colspan="4" class="text-center muted py-2">No parts listed.</td></tr>
                     <?php endif; ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div>
+            <!-- Attachments Summary -->
+            <?php if (!empty($r['attachments'])): ?>
+                <div class="card mb-4">
+                    <h3 class="section-title">📎 Attachments</h3>
+                    <div class="attachments-grid">
+                        <?php foreach (array_slice($r['attachments'], 0, 4) as $attachment): // Show max 4 ?>
+                            <?php
+                              $file_path = $attachment['file_path'];
+                              $file_type = strtolower($attachment['file_type']);
+                              $full_url = get_file_url($file_path);
+                              $filename = basename($file_path);
+                              $is_image = is_image_type($file_type);
+                              $is_video = is_video_type($file_type);
+                            ?>
+                            <div class="attachment-item"
+                                 onclick="openLightbox('<?= e(addslashes($full_url)) ?>', '<?= e(addslashes($filename)) ?>', '<?= $is_image ? 'image' : ($is_video ? 'video' : 'file') ?>')"
+                                 title="Click to view: <?= e($filename) ?>">
+                              <?php if ($is_image): ?>
+                                <img src="<?= e($full_url) ?>" alt="Image: <?= e($filename) ?>" loading="lazy">
+                              <?php elseif ($is_video): ?>
+                                <video muted playsinline>
+                                  <source src="<?= e($full_url) ?>" type="video/<?= e($file_type) ?>">
+                                  <div class="attachment-placeholder">🎥</div>
+                                </video>
+                              <?php else: ?>
+                                <div class="attachment-placeholder"><?= strtoupper(e($file_type)) ?></div>
+                              <?php endif; ?>
+                              <div class="attachment-filename"><?= e($filename) ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                        <?php if (count($r['attachments']) > 4): ?>
+                            <div class="attachment-item" style="display: flex; align-items: center; justify-content: center; background: var(--field-border); color: var(--muted); font-size: 0.8rem;">
+                                +<?= count($r['attachments']) - 4 ?> more
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endif; ?>
           </div>
-          <form method="post" onsubmit="return confirm('Mark this request as delivered to the customer?');">
+        </div>
+      </article>
+      <?php endforeach; ?>
+      <?php if(empty($pendingApprovalRows)): ?>
+        <p class="muted text-center py-4">No quotes are pending customer approval.</p>
+      <?php endif; ?>
+    </div>
+  </section>
+
+  <!-- Approved & Repairing -->
+  <section id="approved-repairing" class="tab-content" role="tabpanel" aria-labelledby="tab-approved-repairing">
+    <input type="text" class="search-input" placeholder="🔎 Search..." data-target="list-approved-repairing" aria-label="Search Approved & Repairing requests">
+    <div id="list-approved-repairing">
+      <?php foreach($approvedRepairingRows as $r):
+        $plist   = parts_for($r['id']);
+        $invoice = get_invoice($r['id']); // Guaranteed to exist and be 'Approved' by query
+        $history = history_for($r['id']);
+        // Fallback chain for problem description
+        $problemText = $r['problem'] ?? ($r['problem_reported'] ?? ($r['issue_description'] ?? ($r['notes'] ?? '')));
+        // Parse problem list (assuming '; ' separator)
+        $problemList = $problemText ? array_map('trim', explode(';', $problemText)) : [];
+        $problemList = array_filter($problemList, fn($item) => !empty($item));
+      ?>
+      <article class="card searchable"
+        data-ticket="<?= strtolower(e($r['ticket_code'])) ?>"
+        data-device="<?= strtolower(e($r['device_type'])) ?>"
+        data-brand="<?= strtolower(e($r['brand'] ?? '')) ?>"
+        data-model="<?= strtolower(e($r['model'] ?? '')) ?>"
+        data-customer="<?= strtolower(e($r['cust_name'])) ?>">
+        <div class="card-header">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2><?= e($r['ticket_code']) ?></h2>
+              <span class="chip status-inrepair"><?= e($r['status']) ?></span>
+              <?php if($invoice): ?>
+                <span class="chip status-approved">Quote #<?= e($invoice['id']) ?> — <?= e($invoice['quote_status']) ?></span>
+              <?php endif; ?>
+            </div>
+            <div class="text-sm muted mt-1">
+              <?= e($r['device_type']) ?><?= $r['brand']?' · <span class="font-medium">'.e($r['brand']).'</span>':'' ?><?= $r['model']?' · <span class="font-medium">'.e($r['model']).'</span>':'' ?>
+            </div>
+            <div class="text-sm muted mt-1">
+              Customer: <span class="font-medium"><?= e($r['cust_name']) ?></span> • <?= e($r['cust_email']) ?><?= $r['cust_phone']?' • '.e($r['cust_phone']):'' ?>
+            </div>
+          </div>
+          <form method="post" onsubmit="return confirm('Send this request to Billing?');">
             <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
-            <button class="btn success" name="act" value="mark_delivered">Mark Delivered</button>
+            <button class="btn primary" name="act" value="complete">Send to Billing</button>
           </form>
         </div>
 
-        <!-- Attachments Summary in Billed Card -->
-        <?php if (!empty($r['attachments'])): ?>
-            <div class="mt-2">
-                <h4 class="text-xs muted mb-1">Attachments:</h4>
-                <div class="attachments-grid">
-                    <?php foreach (array_slice($r['attachments'], 0, 4) as $attachment): // Show max 4 ?>
-                        <?php
-                          $file_path = $attachment['file_path'];
-                          $file_type = strtolower($attachment['file_type']);
-                          $full_url = get_file_url($file_path);
-                          $filename = basename($file_path);
-                          $is_image = is_image_type($file_type);
-                          $is_video = is_video_type($file_type);
-                        ?>
-                        <div class="attachment-item"
-                             onclick="openLightbox('<?= e(addslashes($full_url)) ?>', '<?= e(addslashes($filename)) ?>', '<?= $is_image ? 'image' : ($is_video ? 'video' : 'file') ?>')"
-                             title="Click to view: <?= e($filename) ?>">
-                          <?php if ($is_image): ?>
-                            <img src="<?= e($full_url) ?>" alt="Image: <?= e($filename) ?>" loading="lazy">
-                          <?php elseif ($is_video): ?>
-                            <video muted playsinline>
-                              <source src="<?= e($full_url) ?>" type="video/<?= e($file_type) ?>">
-                              <div class="attachment-placeholder">🎥</div>
-                            </video>
-                          <?php else: ?>
-                            <div class="attachment-placeholder"><?= strtoupper(e($file_type)) ?></div>
-                          <?php endif; ?>
-                          <div class="attachment-filename"><?= e($filename) ?></div>
-                        </div>
-                    <?php endforeach; ?>
-                    <?php if (count($r['attachments']) > 4): ?>
-                        <div class="attachment-item" style="display: flex; align-items: center; justify-content: center; background: var(--field-border); color: var(--muted); font-size: 0.8rem;">
-                            +<?= count($r['attachments']) - 4 ?> more
-                        </div>
-                    <?php endif; ?>
-                </div>
+        <div class="grid-2">
+          <div>
+            <!-- Problem Reported Summary -->
+            <div class="highlight-box">
+              <h3 class="section-title">⚠️ Problem Reported</h3>
+              <?php if ($problemText): ?>
+                <?php if (!empty($problemList) && count($problemList) > 1): ?>
+                     <div class="text-sm"><?= implode(', ', array_slice(array_map('e', $problemList), 0, 3)) ?><?= count($problemList) > 3 ? '...' : '' ?></div>
+                <?php else: ?>
+                     <div class="text-sm"><?= e(implode(', ', $problemList)) ?></div>
+                <?php endif; ?>
+              <?php else: ?>
+                <div class="text-sm muted">No problem description provided.</div>
+              <?php endif; ?>
             </div>
-        <?php endif; ?>
+
+            <!-- Approved Parts List -->
+            <div class="card">
+              <h3 class="section-title">🧰 Approved Parts</h3>
+              <div class="overflow-x-auto">
+                <table class="parts-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Remarks</th>
+                      <th class="actions-cell">Action</th> <!-- Allow removal/editing during repair? -->
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach($plist as $p): ?>
+                      <tr>
+                        <td><?= e($p['item']) ?></td>
+                        <td><?= e($p['qty']) ?></td>
+                        <td class="muted"><?= e($p['unit']) ?></td>
+                        <td class="muted"><?= e($p['remarks']) ?></td>
+                        <td class="actions-cell">
+                          <!-- Placeholder for potential actions like 'Used', 'Not Needed' etc. -->
+                          <span class="text-xs muted">-</span>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                    <?php if(!$plist): ?>
+                      <tr><td colspan="5" class="text-center muted py-2">No parts listed.</td></tr>
+                    <?php endif; ?>
+                  </tbody>
+                </table>
+              </div>
+              <!-- Add part during repair if needed -->
+              <form method="post" class="mt-4">
+                <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
+
+                <div class="form-row">
+                  <div>
+                    <label for="item-add-<?= e($r['id']) ?>">Add Item</label>
+                    <input id="item-add-<?= e($r['id']) ?>" name="item" placeholder="e.g., Extra Cable">
+                  </div>
+                  <div>
+                    <label for="unit-add-<?= e($r['id']) ?>">Unit</label>
+                    <input id="unit-add-<?= e($r['id']) ?>" name="unit" placeholder="pcs" value="pcs">
+                  </div>
+                  <div>
+                    <label for="qty-add-<?= e($r['id']) ?>">Qty</label>
+                    <input id="qty-add-<?= e($r['id']) ?>" name="qty" type="number" step="0.01" value="1" min="0.01">
+                  </div>
+                  <div>
+                    <label for="remarks-add-<?= e($r['id']) ?>">Remarks</label>
+                    <input id="remarks-add-<?= e($r['id']) ?>" name="remarks" placeholder="Reason">
+                  </div>
+                </div>
+                <button class="btn outline" name="act" value="addpart">➕ Add During Repair</button>
+              </form>
+            </div>
+
+            <!-- Technician Notes -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="section-title">📝 Technician Notes</h3>
+              </div>
+              <form method="post">
+                <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="rid" value="<?= e($r['id']) ?>">
+                <div class="form-group">
+                    <label for="note_text-repair-<?= e($r['id']) ?>" class="sr-only">Add Repair Note</label>
+                    <textarea id="note_text-repair-<?= e($r['id']) ?>" class="w-full" name="note_text" placeholder="Work progress, findings, additional issues..." rows="3" required></textarea>
+                </div>
+                <button class="btn subtle" name="act" value="add_note">➕ Add Note</button>
+              </form>
+            </div>
+          </div>
+          <div>
+            <!-- Attachments Summary -->
+            <?php if (!empty($r['attachments'])): ?>
+                <div class="card mb-4">
+                    <h3 class="section-title">📎 Attachments</h3>
+                    <div class="attachments-grid">
+                        <?php foreach (array_slice($r['attachments'], 0, 4) as $attachment): // Show max 4 ?>
+                            <?php
+                              $file_path = $attachment['file_path'];
+                              $file_type = strtolower($attachment['file_type']);
+                              $full_url = get_file_url($file_path);
+                              $filename = basename($file_path);
+                              $is_image = is_image_type($file_type);
+                              $is_video = is_video_type($file_type);
+                            ?>
+                            <div class="attachment-item"
+                                 onclick="openLightbox('<?= e(addslashes($full_url)) ?>', '<?= e(addslashes($filename)) ?>', '<?= $is_image ? 'image' : ($is_video ? 'video' : 'file') ?>')"
+                                 title="Click to view: <?= e($filename) ?>">
+                              <?php if ($is_image): ?>
+                                <img src="<?= e($full_url) ?>" alt="Image: <?= e($filename) ?>" loading="lazy">
+                              <?php elseif ($is_video): ?>
+                                <video muted playsinline>
+                                  <source src="<?= e($full_url) ?>" type="video/<?= e($file_type) ?>">
+                                  <div class="attachment-placeholder">🎥</div>
+                                </video>
+                              <?php else: ?>
+                                <div class="attachment-placeholder"><?= strtoupper(e($file_type)) ?></div>
+                              <?php endif; ?>
+                              <div class="attachment-filename"><?= e($filename) ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                        <?php if (count($r['attachments']) > 4): ?>
+                            <div class="attachment-item" style="display: flex; align-items: center; justify-content: center; background: var(--field-border); color: var(--muted); font-size: 0.8rem;">
+                                +<?= count($r['attachments']) - 4 ?> more
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Timeline -->
+            <div class="card">
+              <h3 class="section-title">🕒 Status & Notes Timeline</h3>
+              <div class="timeline">
+                <?php if($history): foreach($history as $h): ?>
+                <div class="timeline-item">
+                  <span class="timeline-dot"></span>
+                  <div class="timeline-header">
+                    <div class="timeline-status"><?= e($h['status']) ?></div>
+                    <div class="text-xs muted"><?= e($h['created_at'] ?? '') ?></div>
+                  </div>
+                  <?php if($h['note']): ?>
+                    <div class="timeline-note"><?= nl2br(e($h['note'])) ?></div>
+                  <?php endif; ?>
+                  <div class="timeline-meta">
+                    <span>by <?= e($h['user_name'] ?: 'System') ?></span>
+                  </div>
+                </div>
+                <?php endforeach; else: ?>
+                 <div class="timeline-empty">No timeline entries yet.</div>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
       </article>
       <?php endforeach; ?>
-      <?php if(!array_filter($rows, fn($x)=>$x['status']==='Billed')): ?>
-        <p class="muted text-center py-4">No requests are currently Billed or Ready for Billing.</p>
+      <?php if(empty($approvedRepairingRows)): ?>
+        <p class="muted text-center py-4">No requests are currently approved and under repair.</p>
       <?php endif; ?>
     </div>
   </section>
@@ -1448,7 +1657,7 @@ function toggleProblemList(triggerElement, requestId) {
 }
 // --- End Toggle Problem List Dropdown ---
 
-// --- Toggle Edit Forms (for Device Details) ---
+// --- Toggle Edit Forms ---
 document.querySelectorAll('.toggle-edit').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const sel = btn.getAttribute('data-target');
@@ -1508,23 +1717,6 @@ const applySearch = debounce(() => {
 document.querySelectorAll('.search-input').forEach(input => {
     input.addEventListener('input', applySearch);
 });
-
-
-// --- Collapsible Sections ---
-document.querySelectorAll('.expand-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const targetId = this.getAttribute('data-target');
-        const content = document.querySelector(targetId);
-        const icon = this.querySelector('.expand-icon');
-
-        if (content && icon) {
-            content.classList.toggle('active');
-            icon.classList.toggle('rotated');
-            this.querySelector('span').textContent = content.classList.contains('active') ? 'Collapse Details' : 'Expand Details';
-        }
-    });
-});
-// --- End Collapsible Sections ---
 </script>
 </body>
 </html>
